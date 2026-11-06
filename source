@@ -1,0 +1,54 @@
+--  for user created
+
+CREATE TABLE users (
+    user_id SERIAL PRIMARY KEY,
+    username VARCHAR(100) UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL,
+    role VARCHAR(20) NOT NULL
+        CHECK (role IN ('ADMIN_HR', 'EMPLOYEE')),
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+
+
+-- For employee table
+CREATE TABLE employees (
+    employee_id SERIAL PRIMARY KEY,
+    first_name VARCHAR(100) NOT NULL,
+    last_name VARCHAR(100) NOT NULL,
+    ic_passport VARCHAR(50) UNIQUE NOT NULL,
+    user_id INTEGER UNIQUE NOT NULL REFERENCES users(user_id),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+
+CREATE TABLE IF NOT EXISTS employee_family (
+    family_id SERIAL PRIMARY KEY,
+    employee_id INT NOT NULL,
+    family_member_name VARCHAR(100) NOT NULL,
+    relationship VARCHAR(50) NOT NULL,
+    contact_number VARCHAR(20),
+    date_of_birth DATE,
+    FOREIGN KEY (employee_id)
+        REFERENCES employees(employee_id)
+        ON DELETE CASCADE
+);
+
+
+CREATE TABLE leave_applications (
+    leave_id SERIAL PRIMARY KEY,
+    employee_id INT NOT NULL,
+    leave_type VARCHAR(50) NOT NULL,
+    start_date DATE NOT NULL,
+    end_date DATE NOT NULL,
+    reason TEXT NOT NULL,
+    status VARCHAR(20) DEFAULT 'Pending',
+    applied_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    reviewed_by VARCHAR(100),
+    reviewed_date TIMESTAMP,
+    FOREIGN KEY (employee_id)
+        REFERENCES employees(employee_id),
+    CHECK (end_date >= start_date),
+    CHECK (status IN ('Pending', 'Approved', 'Rejected'))
+);

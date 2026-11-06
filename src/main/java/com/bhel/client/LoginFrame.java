@@ -1,6 +1,8 @@
 
 package com.bhel.client;
 
+import com.bhel.model.Employee;
+
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
@@ -45,10 +47,10 @@ public class LoginFrame extends JFrame {
 
         JLabel description = new JLabel(
                 "<html><div style='width:260px;'>"
-                + "A centralized platform for managing employee "
-                + "information, leave applications and HR activities."
-                + "</div></html>"
-        );
+                        + "A centralized platform for managing employee "
+                        + "information, leave applications and HR activities."
+                        + "</div></html>");
+
         description.setFont(new Font("Segoe UI", Font.PLAIN, 14));
         description.setForeground(new Color(215, 225, 240));
 
@@ -142,22 +144,24 @@ public class LoginFrame extends JFrame {
         add(mainPanel);
     }
 
+    // LABEL STYLE
     private void styleLabel(JLabel label) {
         label.setFont(new Font("Segoe UI", Font.BOLD, 13));
         label.setForeground(NAVY);
         label.setAlignmentX(Component.LEFT_ALIGNMENT);
     }
 
+    // TEXT FIELD STYLE
     private void styleField(JTextField field) {
         field.setFont(new Font("Segoe UI", Font.PLAIN, 14));
         field.setMaximumSize(new Dimension(Integer.MAX_VALUE, 42));
         field.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createLineBorder(new Color(210, 215, 225)),
-                new EmptyBorder(8, 10, 8, 10)
-        ));
+                new EmptyBorder(8, 10, 8, 10)));
         field.setAlignmentX(Component.LEFT_ALIGNMENT);
     }
 
+    // COMBOBOX STYLE
     private void styleCombo(JComboBox<String> combo) {
         combo.setFont(new Font("Segoe UI", Font.PLAIN, 14));
         combo.setMaximumSize(new Dimension(Integer.MAX_VALUE, 42));
@@ -169,7 +173,7 @@ public class LoginFrame extends JFrame {
 
         String username = usernameField.getText().trim();
         String password = new String(passwordField.getPassword());
-        String role = roleBox.getSelectedItem().toString();
+        String role = (String) roleBox.getSelectedItem();
 
         if (username.isEmpty() || password.isEmpty()) {
 
@@ -185,18 +189,23 @@ public class LoginFrame extends JFrame {
 
         HRMClient client = new HRMClient();
 
-        String response = client.login(username, password, role);
+        // ADMIN / HR STAFF LOGIN
+        if ("Admin / HR Staff".equals(role)) {
 
-        if ("Login successful!".equals(response)) {
-
-            JOptionPane.showMessageDialog(
-                    this,
-                    response,
-                    "BHEL HRM Login",
-                    JOptionPane.INFORMATION_MESSAGE
+            String response = client.login(
+                    username,
+                    password,
+                    role
             );
 
-            if ("Admin / HR Staff".equals(role)) {
+            if ("Login successful!".equals(response)) {
+
+                JOptionPane.showMessageDialog(
+                        this,
+                        response,
+                        "BHEL HRM Login",
+                        JOptionPane.INFORMATION_MESSAGE
+                );
 
                 dispose();
 
@@ -206,26 +215,64 @@ public class LoginFrame extends JFrame {
 
                 JOptionPane.showMessageDialog(
                         this,
-                        "Employee dashboard will be implemented next."
+                        response,
+                        "Login Failed",
+                        JOptionPane.ERROR_MESSAGE
                 );
             }
+        }
 
-        } else {
+        // EMPLOYEE LOGIN
+        else if ("Employee".equals(role)) {
 
-            JOptionPane.showMessageDialog(
-                    this,
-                    response,
-                    "Login Failed",
-                    JOptionPane.ERROR_MESSAGE
-            );
+            try {
+
+                Employee employee = client.loginEmployee(
+                        username,
+                        password
+                );
+
+                if (employee != null && employee.getEmployeeId() > 0) {
+
+                    JOptionPane.showMessageDialog(
+                            this,
+                            "Login successful!",
+                            "BHEL HRM Login",
+                            JOptionPane.INFORMATION_MESSAGE
+                    );
+
+                    dispose();
+
+                    new com.bhel.ui.EmployeeDashboard(employee)
+                            .setVisible(true);
+
+                } else {
+
+                    JOptionPane.showMessageDialog(
+                            this,
+                            "Invalid employee credentials or employee ID.",
+                            "Login Failed",
+                            JOptionPane.ERROR_MESSAGE
+                    );
+                }
+
+            } catch (Exception e) {
+
+                JOptionPane.showMessageDialog(
+                        this,
+                        "Employee login failed: " + e.getMessage(),
+                        "Login Error",
+                        JOptionPane.ERROR_MESSAGE
+                );
+            }
         }
     }
 
     // CLEAR METHOD
     private void clearFields() {
+
         usernameField.setText("");
         passwordField.setText("");
         roleBox.setSelectedIndex(0);
     }
-
 }

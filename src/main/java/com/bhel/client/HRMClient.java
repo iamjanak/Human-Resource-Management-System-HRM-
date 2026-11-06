@@ -2,7 +2,10 @@
 package com.bhel.client;
 
 import com.bhel.remote.HRMService;
+import com.bhel.model.Employee;
+
 import java.rmi.Naming;
+import java.util.List;
 
 public class HRMClient {
 
@@ -23,6 +26,7 @@ public class HRMClient {
         }
     }
 
+    // Employee and Admin Login
     public String login(String username, String password, String role) {
 
         try {
@@ -36,4 +40,71 @@ public class HRMClient {
             return "Login request failed: " + e.getMessage();
         }
     }
+
+    // Register Employee
+    public String registerEmployee(
+            String firstName,
+            String lastName,
+            String icPassport,
+            String username,
+            String password) {
+
+        try {
+            if (service == null) {
+                return "Server connection is unavailable.";
+            }
+
+            return service.registerEmployee(
+                    firstName,
+                    lastName,
+                    icPassport,
+                    username,
+                    password
+            );
+
+        } catch (Exception e) {
+            return "Employee registration failed: " + e.getMessage();
+        }
+    }
+
+    // Get All Employees
+    public List<Employee> getAllEmployees() {
+
+        try {
+            if (service == null) {
+                throw new IllegalStateException(
+                        "Server connection is unavailable."
+                );
+            }
+
+            return service.getAllEmployees();
+
+        } catch (Exception e) {
+            throw new RuntimeException(
+                    "Unable to retrieve employee records: "
+                    + e.getMessage(), e
+            );
+        }
+    }
+    
+    // EMPLOYEE LOGIN - RETURN EMPLOYEE OBJECT
+public Employee loginEmployee(
+        String username,
+        String password) {
+
+    try {
+
+        if (service == null) {
+            throw new IllegalStateException(
+                    "Server connection is unavailable.");
+        }
+
+        return service.loginEmployee(username, password);
+
+    } catch (Exception e) {
+
+        throw new RuntimeException(
+                "Employee login failed: " + e.getMessage(), e);
+    }
+}
 }
