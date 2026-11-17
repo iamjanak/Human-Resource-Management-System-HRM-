@@ -5,7 +5,7 @@ import com.bhel.database.DBConnection;
 import com.bhel.remote.HRMService;
 import com.bhel.security.PasswordUtil;
 
-
+import com.bhel.model.FamilyMember;
 import com.bhel.model.LeaveApplication;
 import java.sql.Date;
 import java.time.LocalDate;
@@ -563,5 +563,244 @@ public Employee loginEmployee(String username, String password)
         }
     }
 
+
+
+
+    // ==========================================
+    // EMPLOYEE PROFILE MANAGEMENT
+    // ==========================================
+
+    // GET EMPLOYEE BY ID
+    @Override
+    public Employee getEmployeeById(int employeeId)
+            throws RemoteException {
+
+        String sql = "SELECT e.employee_id, e.first_name, "
+                + "e.last_name, e.ic_passport, u.username "
+                + "FROM employees e "
+                + "JOIN users u ON e.user_id = u.user_id "
+                + "WHERE e.employee_id = ?";
+
+        try (Connection connection = DBConnection.getConnection();
+             PreparedStatement statement =
+                     connection.prepareStatement(sql)) {
+
+            statement.setInt(1, employeeId);
+
+            try (ResultSet result = statement.executeQuery()) {
+
+                if (result.next()) {
+                    return new Employee(
+                            result.getInt("employee_id"),
+                            result.getString("first_name"),
+                            result.getString("last_name"),
+                            result.getString("ic_passport"),
+                            result.getString("username")
+                    );
+                }
+            }
+
+            return null;
+
+        } catch (Exception e) {
+            e.printStackTrace();
+
+            throw new RemoteException(
+                    "Unable to retrieve employee profile.", e);
+        }
+    }
+
+
+    // ==========================================
+    // FAMILY DETAILS MANAGEMENT
+    // ==========================================
+
+    // ADD FAMILY MEMBER
+    @Override
+    public String addFamilyMember(FamilyMember familyMember)
+            throws RemoteException {
+
+        if (familyMember == null
+                || familyMember.getName() == null
+                || familyMember.getName().trim().isEmpty()
+                || familyMember.getRelationship() == null
+                || familyMember.getRelationship().trim().isEmpty()
+                || familyMember.getDateOfBirth() == null
+                || familyMember.getDateOfBirth().trim().isEmpty()) {
+
+            return "Please provide all required family member details.";
+        }
+
+        String sql = "INSERT INTO employee_family "
+                + "(employee_id, family_member_name, relationship, "
+                + "contact_number, date_of_birth) "
+                + "VALUES (?, ?, ?, ?, ?)";
+
+        try (Connection connection = DBConnection.getConnection();
+             PreparedStatement statement =
+                     connection.prepareStatement(sql)) {
+
+            LocalDate dob = LocalDate.parse(
+                    familyMember.getDateOfBirth());
+
+            if (dob.isAfter(LocalDate.now())) {
+                return "Date of birth cannot be in the future.";
+            }
+
+            statement.setInt(1, familyMember.getEmployeeId());
+            statement.setString(2, familyMember.getName().trim());
+            statement.setString(3, familyMember.getRelationship().trim());
+            statement.setString(4, familyMember.getContactNumber());
+            statement.setDate(5, Date.valueOf(dob));
+
+            int rowsInserted = statement.executeUpdate();
+
+            if (rowsInserted > 0) {
+                return "Family member added successfully!";
+            }
+
+            return "Unable to add family member.";
+
+        } catch (Exception e) {
+            e.printStackTrace();
+
+            return "Family member addition failed: " + e.getMessage();
+        }
+    }
+
+
+    // GET FAMILY MEMBERS BY EMPLOYEE ID
+    @Override
+    public List<FamilyMember> getFamilyMembers(int employeeId)
+            throws RemoteException {
+
+        List<FamilyMember> familyMembers = new ArrayList<>();
+
+        String sql = "SELECT family_id, employee_id, "
+                + "family_member_name, relationship, "
+                + "contact_number, date_of_birth "
+                + "FROM employee_family "
+                + "WHERE employee_id = ? "
+                + "ORDER BY family_id";
+
+        try (Connection connection = DBConnection.getConnection();
+             PreparedStatement statement =
+                     connection.prepareStatement(sql)) {
+
+            statement.setInt(1, employeeId);
+
+            try (ResultSet result = statement.executeQuery()) {
+
+                while (result.next()) {
+
+                    Date dob = result.getDate("date_of_birth");
+
+                    FamilyMember member = new FamilyMember(
+                            result.getInt("family_id"),
+                            result.getInt("employee_id"),
+                            result.getString("family_member_name"),
+                            result.getString("relationship"),
+                            result.getString("contact_number"),
+                            dob != null ? dob.toString() : ""
+                    );
+
+                    familyMembers.add(member);
+                }
+            }
+
+            return familyMembers;
+
+        } catch (Exception e) {
+            e.printStackTrace();
+
+            throw new RemoteException(
+                    "Unable to retrieve family details.", e);
+        }
+    }
+
+
+    // UPDATE FAMILY MEMBER
+    @Override
+    public String updateFamilyMember(FamilyMember familyMember)
+            throws RemoteException {
+
+        if (familyMember == null
+                || familyMember.getName() == null
+                || familyMember.getName().trim().isEmpty()
+                || familyMember.getRelationship() == null
+                || familyMember.getRelationship().trim().isEmpty()
+                || familyMember.getDateOfBirth() == null
+                || familyMember.getDateOfBirth().trim().isEmpty()) {
+
+            return "Please provide all required family member details.";
+        }
+
+        String sql = "UPDATE employee_family "
+                + "SET family_member_name = ?, relationship = ?, "
+                + "contact_number = ?, date_of_birth = ? "
+                + "WHERE family_id = ? AND employee_id = ?";
+
+        try (Connection connection = DBConnection.getConnection();
+             PreparedStatement statement =
+                     connection.prepareStatement(sql)) {
+
+            LocalDate dob = LocalDate.parse(
+                    familyMember.getDateOfBirth());
+
+            if (dob.isAfter(LocalDate.now())) {
+                return "Date of birth cannot be in the future.";
+            }
+
+            statement.setString(1, familyMember.getName().trim());
+            statement.setString(2, familyMember.getRelationship().trim());
+            statement.setString(3, familyMember.getContactNumber());
+            statement.setDate(4, Date.valueOf(dob));
+            statement.setInt(5, familyMember.getFamilyId());
+            statement.setInt(6, familyMember.getEmployeeId());
+
+            int rowsUpdated = statement.executeUpdate();
+
+            if (rowsUpdated > 0) {
+                return "Family member updated successfully!";
+            }
+
+            return "Family member not found.";
+
+        } catch (Exception e) {
+            e.printStackTrace();
+
+            return "Family member update failed: " + e.getMessage();
+        }
+    }
+
+
+    // DELETE FAMILY MEMBER
+    @Override
+    public String deleteFamilyMember(int familyId)
+            throws RemoteException {
+
+        String sql = "DELETE FROM employee_family "
+                + "WHERE family_id = ?";
+
+        try (Connection connection = DBConnection.getConnection();
+             PreparedStatement statement =
+                     connection.prepareStatement(sql)) {
+
+            statement.setInt(1, familyId);
+
+            int rowsDeleted = statement.executeUpdate();
+
+            if (rowsDeleted > 0) {
+                return "Family member deleted successfully!";
+            }
+
+            return "Family member not found.";
+
+        } catch (Exception e) {
+            e.printStackTrace();
+
+            return "Family member deletion failed: " + e.getMessage();
+        }
+    }
 
 }

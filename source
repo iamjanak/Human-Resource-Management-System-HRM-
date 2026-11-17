@@ -1,3 +1,9 @@
+Java Swing for the desktop interface.
+Java RMI for client-server communication.
+PostgreSQL for database storage.
+FlatLaf for the interface theme.
+
+
 --  for user created
 
 CREATE TABLE users (

@@ -11,63 +11,48 @@ import com.bhel.model.LeaveApplication;
 
 public interface HRMService extends Remote {
 
-    // USER LOGIN
-    String login(
-            String username,
-            String password,
-            String role)
+    // Login
+    String login(String username, String password, String role)
             throws RemoteException;
 
-    // EMPLOYEE REGISTRATION
-    String registerEmployee(
-            String firstName,
-            String lastName,
-            String icPassport,
-            String username,
-            String password)
+    Employee loginEmployee(String username, String password)
             throws RemoteException;
 
-    // RETRIEVE ALL EMPLOYEES
-    List<Employee> getAllEmployees()
+    // Employee Management
+    String registerEmployee(String firstName, String lastName,
+                            String icPassport, String username,
+                            String password) throws RemoteException;
+
+    List<Employee> getAllEmployees() throws RemoteException;
+
+    Employee getEmployeeById(int employeeId) throws RemoteException;
+
+    String updateEmployee(int employeeId, String firstName,
+                          String lastName, String icPassport)
             throws RemoteException;
 
-    // UPDATE EMPLOYEE DETAILS
-    String updateEmployee(
-            int employeeId,
-            String firstName,
-            String lastName,
-            String icPassport)
+    // Leave Management
+    String applyLeave(LeaveApplication leave) throws RemoteException;
+
+    List<LeaveApplication> getEmployeeLeaves(int employeeId)
             throws RemoteException;
 
-
-    // ==============================
-    // LEAVE MANAGEMENT
-    // ==============================
-
-    // APPLY FOR LEAVE
-    String applyLeave(LeaveApplication leave)
-            throws RemoteException;
-
-    // RETRIEVE EMPLOYEE LEAVE APPLICATIONS
-    List<LeaveApplication> getEmployeeLeaves(
-            int employeeId)
-            throws RemoteException;
-
-    // RETRIEVE ALL LEAVE APPLICATIONS (ADMIN)
     List<LeaveApplication> getAllLeaveApplications()
             throws RemoteException;
 
-    // APPROVE OR REJECT LEAVE (ADMIN)
-    String reviewLeave(
-            int leaveId,
-            String status,
-            String reviewedBy)
+    String reviewLeave(int leaveId, String status, String reviewedBy)
             throws RemoteException;
 
-    // EMPLOYEE LOGIN - RETURNS EMPLOYEE DETAILS
-        Employee loginEmployee(
-        String username,
-        String password)
-        throws RemoteException;
+    // Family Details Management
+    String addFamilyMember(FamilyMember familyMember)
+            throws RemoteException;
 
+    List<FamilyMember> getFamilyMembers(int employeeId)
+            throws RemoteException;
+
+    String updateFamilyMember(FamilyMember familyMember)
+            throws RemoteException;
+
+    String deleteFamilyMember(int familyId)
+            throws RemoteException;
 }
