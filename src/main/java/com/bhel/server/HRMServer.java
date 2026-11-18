@@ -20,6 +20,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.util.concurrent.CountDownLatch;
+import com.bhel.model.Department;
 
 public class HRMServer extends UnicastRemoteObject implements HRMService {
 
@@ -802,5 +803,183 @@ public Employee loginEmployee(String username, String password)
             return "Family member deletion failed: " + e.getMessage();
         }
     }
+    
+
+    // ==========================================
+    // DEPARTMENT MANAGEMENT
+    // ==========================================
+
+    // ADD DEPARTMENT
+    @Override
+    public String addDepartment(Department department)
+            throws RemoteException {
+
+        if (department == null
+                || department.getDepartmentName() == null
+                || department.getDepartmentName().trim().isEmpty()) {
+            return "Department name is required.";
+        }
+
+        String sql = "INSERT INTO departments "
+                + "(department_name, description) VALUES (?, ?)";
+
+        try (Connection connection = DBConnection.getConnection();
+             PreparedStatement statement =
+                     connection.prepareStatement(sql)) {
+
+            statement.setString(
+                    1, department.getDepartmentName().trim());
+
+            statement.setString(
+                    2, department.getDescription() == null
+                            ? "" : department.getDescription().trim());
+
+            int rows = statement.executeUpdate();
+
+            return rows > 0
+                    ? "Department added successfully!"
+                    : "Unable to add department.";
+
+        } catch (java.sql.SQLException e) {
+
+            if ("23505".equals(e.getSQLState())) {
+                return "A department with this name already exists.";
+            }
+
+            e.printStackTrace();
+            return "Department addition failed: " + e.getMessage();
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return "Department addition failed: " + e.getMessage();
+        }
+    }
+
+    // GET ALL DEPARTMENTS
+    @Override
+    public List<Department> getAllDepartments()
+            throws RemoteException {
+
+        List<Department> departments = new ArrayList<>();
+
+        String sql = "SELECT department_id, department_name, description "
+                + "FROM departments ORDER BY department_name";
+
+        try (Connection connection = DBConnection.getConnection();
+             PreparedStatement statement =
+                     connection.prepareStatement(sql);
+             ResultSet result = statement.executeQuery()) {
+
+            while (result.next()) {
+
+                Department department = new Department(
+                        result.getInt("department_id"),
+                        result.getString("department_name"),
+                        result.getString("description")
+                );
+
+                departments.add(department);
+            }
+
+            return departments;
+
+        } catch (Exception e) {
+            e.printStackTrace();
+
+            throw new RemoteException(
+                    "Unable to retrieve departments.", e);
+        }
+    }
+
+    // UPDATE DEPARTMENT
+    @Override
+    public String updateDepartment(Department department)
+            throws RemoteException {
+
+        if (department == null
+                || department.getDepartmentId() <= 0
+                || department.getDepartmentName() == null
+                || department.getDepartmentName().trim().isEmpty()) {
+
+            return "Valid department ID and department name are required.";
+        }
+
+        String sql = "UPDATE departments "
+                + "SET department_name = ?, description = ? "
+                + "WHERE department_id = ?";
+
+        try (Connection connection = DBConnection.getConnection();
+             PreparedStatement statement =
+                     connection.prepareStatement(sql)) {
+
+            statement.setString(
+                    1, department.getDepartmentName().trim());
+
+            statement.setString(
+                    2, department.getDescription() == null
+                            ? "" : department.getDescription().trim());
+
+            statement.setInt(3, department.getDepartmentId());
+
+            int rows = statement.executeUpdate();
+
+            return rows > 0
+                    ? "Department updated successfully!"
+                    : "Department not found.";
+
+        } catch (java.sql.SQLException e) {
+
+            if ("23505".equals(e.getSQLState())) {
+                return "A department with this name already exists.";
+            }
+
+            e.printStackTrace();
+            return "Department update failed: " + e.getMessage();
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return "Department update failed: " + e.getMessage();
+        }
+    }
+
+    // DELETE DEPARTMENT
+    @Override
+    public String deleteDepartment(int departmentId)
+            throws RemoteException {
+
+        if (departmentId <= 0) {
+            return "Invalid department ID.";
+        }
+
+        String sql = "DELETE FROM departments WHERE department_id = ?";
+
+        try (Connection connection = DBConnection.getConnection();
+             PreparedStatement statement =
+                     connection.prepareStatement(sql)) {
+
+            statement.setInt(1, departmentId);
+
+            int rows = statement.executeUpdate();
+
+            return rows > 0
+                    ? "Department deleted successfully!"
+                    : "Department not found.";
+
+        } catch (java.sql.SQLException e) {
+
+            if ("23503".equals(e.getSQLState())) {
+                return "This department is assigned to employee records "
+                        + "and cannot be deleted.";
+            }
+
+            e.printStackTrace();
+            return "Department deletion failed: " + e.getMessage();
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return "Department deletion failed: " + e.getMessage();
+        }
+    }
+
 
 }

@@ -8,17 +8,25 @@ import java.util.List;
 import com.bhel.model.Employee;
 import com.bhel.model.FamilyMember;
 import com.bhel.model.LeaveApplication;
+import com.bhel.model.Department;
 
 public interface HRMService extends Remote {
 
-    // Login
+    // ==========================================
+    // LOGIN
+    // ==========================================
+
     String login(String username, String password, String role)
             throws RemoteException;
 
     Employee loginEmployee(String username, String password)
             throws RemoteException;
 
-    // Employee Management
+
+    // ==========================================
+    // EMPLOYEE MANAGEMENT
+    // ==========================================
+
     String registerEmployee(String firstName, String lastName,
                             String icPassport, String username,
                             String password) throws RemoteException;
@@ -31,7 +39,11 @@ public interface HRMService extends Remote {
                           String lastName, String icPassport)
             throws RemoteException;
 
-    // Leave Management
+
+    // ==========================================
+    // LEAVE MANAGEMENT
+    // ==========================================
+
     String applyLeave(LeaveApplication leave) throws RemoteException;
 
     List<LeaveApplication> getEmployeeLeaves(int employeeId)
@@ -43,7 +55,11 @@ public interface HRMService extends Remote {
     String reviewLeave(int leaveId, String status, String reviewedBy)
             throws RemoteException;
 
-    // Family Details Management
+
+    // ==========================================
+    // FAMILY DETAILS MANAGEMENT
+    // ==========================================
+
     String addFamilyMember(FamilyMember familyMember)
             throws RemoteException;
 
@@ -54,5 +70,22 @@ public interface HRMService extends Remote {
             throws RemoteException;
 
     String deleteFamilyMember(int familyId)
+            throws RemoteException;
+
+
+    // ==========================================
+    // DEPARTMENT MANAGEMENT
+    // ==========================================
+
+    String addDepartment(Department department)
+            throws RemoteException;
+
+    List<Department> getAllDepartments()
+            throws RemoteException;
+
+    String updateDepartment(Department department)
+            throws RemoteException;
+
+    String deleteDepartment(int departmentId)
             throws RemoteException;
 }

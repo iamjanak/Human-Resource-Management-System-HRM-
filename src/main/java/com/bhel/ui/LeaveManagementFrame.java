@@ -1,4 +1,3 @@
-
 package com.bhel.ui;
 
 import com.bhel.model.LeaveApplication;
@@ -25,6 +24,7 @@ public class LeaveManagementFrame extends JFrame {
 
     private final HRMService hrmService;
     private final int employeeId;
+    private final boolean adminMode;
 
     private JComboBox<String> leaveType;
     private DatePickerField startDatePicker;
@@ -34,14 +34,37 @@ public class LeaveManagementFrame extends JFrame {
     private JTable leaveTable;
     private DefaultTableModel tableModel;
 
-    // Fixed: declare the missing panels
     private JPanel formContainer;
     private JPanel tablePanel;
 
+    // ==========================================
+    // EMPLOYEE CONSTRUCTOR
+    // ==========================================
+
     public LeaveManagementFrame(HRMService hrmService, int employeeId) {
+        this(hrmService, employeeId, false);
+    }
+
+    // ==========================================
+    // ADMIN CONSTRUCTOR
+    // ==========================================
+
+    public LeaveManagementFrame(HRMService hrmService) {
+        this(hrmService, 0, true);
+    }
+
+    // ==========================================
+    // MAIN CONSTRUCTOR
+    // ==========================================
+
+    private LeaveManagementFrame(
+            HRMService hrmService,
+            int employeeId,
+            boolean adminMode) {
 
         this.hrmService = hrmService;
         this.employeeId = employeeId;
+        this.adminMode = adminMode;
 
         setTitle("BHEL HRM - Leave Management");
         setSize(1150, 780);
@@ -54,7 +77,6 @@ public class LeaveManagementFrame extends JFrame {
 
         createHeader();
 
-        // Main content holds the form and table
         JPanel mainContent = new JPanel(new BorderLayout(0, 12));
         mainContent.setBackground(LIGHT_BG);
 
@@ -63,8 +85,14 @@ public class LeaveManagementFrame extends JFrame {
         createApplicationForm();
         createLeaveTable();
 
-        mainContent.add(formContainer, BorderLayout.NORTH);
-        mainContent.add(tablePanel, BorderLayout.CENTER);
+        // Admin sees only leave records
+        if (adminMode) {
+            formContainer.setVisible(false);
+            mainContent.add(tablePanel, BorderLayout.CENTER);
+        } else {
+            mainContent.add(formContainer, BorderLayout.NORTH);
+            mainContent.add(tablePanel, BorderLayout.CENTER);
+        }
 
         loadLeaveApplications();
     }
@@ -84,7 +112,9 @@ public class LeaveManagementFrame extends JFrame {
         title.setFont(new Font("Segoe UI", Font.BOLD, 26));
 
         JLabel subtitle = new JLabel(
-                "Apply for leave and manage your leave applications");
+                adminMode
+                        ? "Review and manage employee leave requests"
+                        : "Apply for leave and manage your leave applications");
 
         subtitle.setForeground(new Color(210, 220, 235));
         subtitle.setFont(new Font("Segoe UI", Font.PLAIN, 13));
@@ -327,7 +357,6 @@ public class LeaveManagementFrame extends JFrame {
             JPanel daysPanel = new JPanel(
                     new GridLayout(0, 7, 4, 4));
 
-            // Refresh calendar
             Runnable refreshCalendar = () -> {
 
                 daysPanel.removeAll();
@@ -545,8 +574,10 @@ public class LeaveManagementFrame extends JFrame {
         tablePanel.setBorder(
                 new EmptyBorder(10, 25, 20, 25));
 
-        JLabel historyTitle =
-                new JLabel("My Leave Applications");
+        JLabel historyTitle = new JLabel(
+                adminMode
+                        ? "All Employee Leave Requests"
+                        : "My Leave Applications");
 
         historyTitle.setFont(
                 new Font("Segoe UI", Font.BOLD, 19));
@@ -609,6 +640,14 @@ public class LeaveManagementFrame extends JFrame {
     // ==========================================
 
     private void applyLeave() {
+
+        // Admin cannot submit leave from this page
+        if (adminMode) {
+            JOptionPane.showMessageDialog(
+                    this,
+                    "Admin cannot submit employee leave applications from this page.");
+            return;
+        }
 
         try {
 
@@ -704,28 +743,48 @@ public class LeaveManagementFrame extends JFrame {
 
             tableModel.setRowCount(0);
 
-            if (employeeId <= 0) {
+            // ADMIN MODE: Load all employee leave applications
+            if (adminMode) {
 
-                JOptionPane.showMessageDialog(
-                        this,
-                        "Invalid employee ID. Cannot load leave records.",
-                        "Employee Error",
-                        JOptionPane.ERROR_MESSAGE);
+                for (LeaveApplication leave :
+                        hrmService.getAllLeaveApplications()) {
 
-                return;
-            }
+                    tableModel.addRow(new Object[]{
+                            leave.getLeaveId(),
+                            leave.getLeaveType(),
+                            leave.getStartDate(),
+                            leave.getEndDate(),
+                            leave.getReason(),
+                            leave.getStatus()
+                    });
+                }
 
-            for (LeaveApplication leave :
-                    hrmService.getEmployeeLeaves(employeeId)) {
+            } else {
 
-                tableModel.addRow(new Object[]{
-                        leave.getLeaveId(),
-                        leave.getLeaveType(),
-                        leave.getStartDate(),
-                        leave.getEndDate(),
-                        leave.getReason(),
-                        leave.getStatus()
-                });
+                // EMPLOYEE MODE: Load only their own leave applications
+                if (employeeId <= 0) {
+
+                    JOptionPane.showMessageDialog(
+                            this,
+                            "Invalid employee ID. Cannot load leave records.",
+                            "Employee Error",
+                            JOptionPane.ERROR_MESSAGE);
+
+                    return;
+                }
+
+                for (LeaveApplication leave :
+                        hrmService.getEmployeeLeaves(employeeId)) {
+
+                    tableModel.addRow(new Object[]{
+                            leave.getLeaveId(),
+                            leave.getLeaveType(),
+                            leave.getStartDate(),
+                            leave.getEndDate(),
+                            leave.getReason(),
+                            leave.getStatus()
+                    });
+                }
             }
 
             updateReasonRowHeights();

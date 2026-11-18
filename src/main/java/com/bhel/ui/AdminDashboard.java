@@ -153,12 +153,16 @@ public class AdminDashboard extends JFrame {
         menuPanel.add(menuTitle);
 
         addMenuItem(menuPanel, "Dashboard", this::showDashboard);
-        addMenuItem(menuPanel, "Employee Management", this::openEmployeeManagement);
-        addMenuItem(menuPanel, "Register Employee", this::openRegistration);
-        addMenuItem(menuPanel, "Leave Management", this::openLeaveManagement);
-        addMenuItem(menuPanel, "Employee Reports", this::openReports);
+        addMenuItem(menuPanel, "Employee Management",
+                this::openEmployeeManagement);
+        addMenuItem(menuPanel, "Register Employee",
+                this::openRegistration);
+        addMenuItem(menuPanel, "Leave Management",
+                this::openLeaveManagement);
+        addMenuItem(menuPanel, "Employee Reports",
+                this::openReports);
         addMenuItem(menuPanel, "Department Management",
-                () -> showMessage("Department Management"));
+                this::openDepartmentManagement);
         addMenuItem(menuPanel, "Attendance Management",
                 () -> showMessage("Attendance Management"));
         addMenuItem(menuPanel, "System Settings",
@@ -333,10 +337,12 @@ public class AdminDashboard extends JFrame {
                 "View employee reports",
                 this::openReports));
 
+        // UPDATED DEPARTMENT QUICK ACTION
+
         actionsPanel.add(createActionCard(
                 "Departments",
                 "Manage department information",
-                () -> showMessage("Department Management")));
+                this::openDepartmentManagement));
 
         actionsPanel.add(createActionCard(
                 "Attendance",
@@ -534,7 +540,7 @@ public class AdminDashboard extends JFrame {
         }
 
         LeaveManagementFrame frame =
-                new LeaveManagementFrame(hrmService, 0);
+                new LeaveManagementFrame(hrmService);
 
         frame.setVisible(true);
     }
@@ -543,7 +549,28 @@ public class AdminDashboard extends JFrame {
 
     private void openReports() {
 
-        showMessage("Employee Reports");
+        if (!checkConnection()) {
+            return;
+        }
+
+        EmployeeReportsFrame frame =
+                new EmployeeReportsFrame(hrmService);
+
+        frame.setVisible(true);
+    }
+
+    // ================= DEPARTMENT MANAGEMENT =================
+
+    private void openDepartmentManagement() {
+
+        if (!checkConnection()) {
+            return;
+        }
+
+        DepartmentManagementFrame frame =
+                new DepartmentManagementFrame(hrmService);
+
+        frame.setVisible(true);
     }
 
     // ================= CONNECTION CHECK =================
