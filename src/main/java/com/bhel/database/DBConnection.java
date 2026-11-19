@@ -16,11 +16,6 @@ public class DBConnection {
     private static final String PASSWORD = "janak";
 
     public static Connection getConnection() throws SQLException {
-
-        return DriverManager.getConnection(
-                URL,
-                USER,
-                PASSWORD
-        );
+        return DriverManager.getConnection(URL, USER, PASSWORD);
     }
 }

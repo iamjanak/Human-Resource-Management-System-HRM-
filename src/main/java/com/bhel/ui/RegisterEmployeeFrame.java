@@ -5,6 +5,7 @@ import com.bhel.client.HRMClient;
 
 import javax.swing.*;
 import java.awt.*;
+import java.time.LocalDate;
 
 public class RegisterEmployeeFrame extends JFrame {
 
@@ -15,6 +16,15 @@ public class RegisterEmployeeFrame extends JFrame {
     private JTextField firstNameField;
     private JTextField lastNameField;
     private JTextField icPassportField;
+    private JComboBox<String> genderField;
+    private JTextField dateOfBirthField;
+    private JTextField phoneField;
+    private JTextField emailField;
+    private JTextField addressField;
+    private JTextField departmentField;
+    private JTextField designationField;
+    private JTextField joiningDateField;
+    private JComboBox<String> employmentStatusField;
     private JTextField usernameField;
     private JPasswordField passwordField;
     private HRMClient client = new HRMClient();
@@ -22,10 +32,12 @@ public class RegisterEmployeeFrame extends JFrame {
     public RegisterEmployeeFrame() {
 
         setTitle("BHEL HRM - Register Employee");
-        setSize(650, 650);
+        setSize(780, 760);
+        setMinimumSize(new Dimension(700, 620));
         setLocationRelativeTo(null);
         setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
         setLayout(new BorderLayout());
+        KeyboardNavigation.installEscape(this, this::dispose);
 
         // Header
         JPanel header = new JPanel();
@@ -60,16 +72,36 @@ public class RegisterEmployeeFrame extends JFrame {
         firstNameField = new JTextField(20);
         lastNameField = new JTextField(20);
         icPassportField = new JTextField(20);
+        genderField = new JComboBox<>(new String[]{
+                "", "Female", "Male", "Other"});
+        dateOfBirthField = new JTextField(20);
+        phoneField = new JTextField(20);
+        emailField = new JTextField(20);
+        addressField = new JTextField(20);
+        departmentField = new JTextField(20);
+        designationField = new JTextField(20);
+        joiningDateField = new JTextField(LocalDate.now().toString(), 20);
+        employmentStatusField = new JComboBox<>(new String[]{
+                "Active", "On Leave", "Resigned", "Terminated"});
         usernameField = new JTextField(20);
         passwordField = new JPasswordField(20);
 
         addFormField(form, gbc, 0, "First Name", firstNameField);
         addFormField(form, gbc, 1, "Last Name", lastNameField);
         addFormField(form, gbc, 2, "IC / Passport Number", icPassportField);
-        addFormField(form, gbc, 3, "Username", usernameField);
-        addFormField(form, gbc, 4, "Password", passwordField);
+        addFormField(form, gbc, 3, "Gender", genderField);
+        addFormField(form, gbc, 4, "Date of Birth (YYYY-MM-DD)", dateOfBirthField);
+        addFormField(form, gbc, 5, "Phone", phoneField);
+        addFormField(form, gbc, 6, "Email", emailField);
+        addFormField(form, gbc, 7, "Address", addressField);
+        addFormField(form, gbc, 8, "Department", departmentField);
+        addFormField(form, gbc, 9, "Designation", designationField);
+        addFormField(form, gbc, 10, "Joining Date (YYYY-MM-DD)", joiningDateField);
+        addFormField(form, gbc, 11, "Employment Status", employmentStatusField);
+        addFormField(form, gbc, 12, "Username", usernameField);
+        addFormField(form, gbc, 13, "Password", passwordField);
 
-        add(form, BorderLayout.CENTER);
+        add(new JScrollPane(form), BorderLayout.CENTER);
 
         // Buttons
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
@@ -125,6 +157,18 @@ public class RegisterEmployeeFrame extends JFrame {
         String icPassport = icPassportField.getText().trim();
         String username = usernameField.getText().trim();
         String password = new String(passwordField.getPassword());
+        LocalDate dateOfBirth;
+        LocalDate joiningDate;
+
+        try {
+            dateOfBirth = parseOptionalDate(dateOfBirthField.getText());
+            joiningDate = parseOptionalDate(joiningDateField.getText());
+        } catch (java.time.format.DateTimeParseException e) {
+            JOptionPane.showMessageDialog(this,
+                    "Dates must use YYYY-MM-DD format.",
+                    "Invalid Date", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
 
         if (firstName.isEmpty()
                 || lastName.isEmpty()
@@ -147,6 +191,15 @@ public class RegisterEmployeeFrame extends JFrame {
                     firstName,
                     lastName,
                     icPassport,
+                    (String) genderField.getSelectedItem(),
+                    dateOfBirth,
+                    phoneField.getText().trim(),
+                    emailField.getText().trim(),
+                    addressField.getText().trim(),
+                    departmentField.getText().trim(),
+                    designationField.getText().trim(),
+                    joiningDate,
+                    (String) employmentStatusField.getSelectedItem(),
                     username,
                     password);
 
@@ -184,7 +237,21 @@ public class RegisterEmployeeFrame extends JFrame {
         firstNameField.setText("");
         lastNameField.setText("");
         icPassportField.setText("");
+        genderField.setSelectedIndex(0);
+        dateOfBirthField.setText("");
+        phoneField.setText("");
+        emailField.setText("");
+        addressField.setText("");
+        departmentField.setText("");
+        designationField.setText("");
+        joiningDateField.setText(LocalDate.now().toString());
+        employmentStatusField.setSelectedItem("Active");
         usernameField.setText("");
         passwordField.setText("");
+    }
+
+    private LocalDate parseOptionalDate(String value) {
+        String trimmed = value == null ? "" : value.trim();
+        return trimmed.isEmpty() ? null : LocalDate.parse(trimmed);
     }
 }

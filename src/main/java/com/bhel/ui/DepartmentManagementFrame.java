@@ -34,6 +34,7 @@ public class DepartmentManagementFrame extends JFrame {
         setLocationRelativeTo(null);
         setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
         setLayout(new BorderLayout());
+        KeyboardNavigation.installEscape(this, this::dispose);
 
         getContentPane().setBackground(LIGHT_BG);
 

@@ -1,18 +1,24 @@
 
 package com.bhel.model;
 
+import java.io.Serializable;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
-public class LeaveApplication {
+public class LeaveApplication implements Serializable {
+
+    private static final long serialVersionUID = 1L;
 
     private int leaveId;
     private int employeeId;
+    private String employeeName;
     private String leaveType;
     private LocalDate startDate;
     private LocalDate endDate;
     private String reason;
     private String status;
     private String reviewedBy;
+    private LocalDateTime appliedDate;
 
     public LeaveApplication() {
     }
@@ -42,6 +48,14 @@ public class LeaveApplication {
 
     public void setEmployeeId(int employeeId) {
         this.employeeId = employeeId;
+    }
+
+    public String getEmployeeName() {
+        return employeeName;
+    }
+
+    public void setEmployeeName(String employeeName) {
+        this.employeeName = employeeName;
     }
 
     public String getLeaveType() {
@@ -90,5 +104,13 @@ public class LeaveApplication {
 
     public void setReviewedBy(String reviewedBy) {
         this.reviewedBy = reviewedBy;
+    }
+
+    public LocalDateTime getAppliedDate() {
+        return appliedDate;
+    }
+
+    public void setAppliedDate(LocalDateTime appliedDate) {
+        this.appliedDate = appliedDate;
     }
 }

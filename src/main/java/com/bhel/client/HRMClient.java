@@ -4,23 +4,21 @@ package com.bhel.client;
 import com.bhel.remote.HRMService;
 import com.bhel.model.Employee;
 import com.bhel.model.FamilyMember;
+import com.bhel.model.Attendance;
 
-import java.rmi.Naming;
 import java.util.List;
+import java.time.LocalDate;
+import java.rmi.Naming;
 
 public class HRMClient {
 
     private HRMService service;
-
     public HRMClient() {
-
         try {
             service = (HRMService) Naming.lookup(
                     "rmi://localhost:1099/HRMService"
             );
-
             System.out.println("Connected to BHEL HRM Server.");
-
         } catch (Exception e) {
             System.out.println("Unable to connect to HRM Server.");
             e.printStackTrace();
@@ -47,6 +45,15 @@ public class HRMClient {
             String firstName,
             String lastName,
             String icPassport,
+            String gender,
+            LocalDate dateOfBirth,
+            String phone,
+            String email,
+            String address,
+            String department,
+            String designation,
+            LocalDate joiningDate,
+            String employmentStatus,
             String username,
             String password) {
 
@@ -59,6 +66,15 @@ public class HRMClient {
                     firstName,
                     lastName,
                     icPassport,
+                    gender,
+                    dateOfBirth,
+                    phone,
+                    email,
+                    address,
+                    department,
+                    designation,
+                    joiningDate,
+                    employmentStatus,
                     username,
                     password
             );
@@ -138,7 +154,16 @@ public class HRMClient {
             int employeeId,
             String firstName,
             String lastName,
-            String icPassport) {
+            String icPassport,
+            String gender,
+            LocalDate dateOfBirth,
+            String phone,
+            String email,
+            String address,
+            String department,
+            String designation,
+            LocalDate joiningDate,
+            String employmentStatus) {
 
         try {
             if (service == null) {
@@ -149,7 +174,16 @@ public class HRMClient {
                     employeeId,
                     firstName,
                     lastName,
-                    icPassport
+                    icPassport,
+                    gender,
+                    dateOfBirth,
+                    phone,
+                    email,
+                    address,
+                    department,
+                    designation,
+                    joiningDate,
+                    employmentStatus
             );
 
         } catch (Exception e) {
@@ -225,4 +259,71 @@ public class HRMClient {
                     + e.getMessage();
         }
     }
+
+    // ==========================================
+    // ATTENDANCE MANAGEMENT
+    // ==========================================
+
+    // 1. Mark Attendance
+    public String markAttendance(Attendance attendance) {
+
+        try {
+            if (service == null) {
+                return "Server connection is unavailable.";
+            }
+
+            return service.markAttendance(attendance);
+
+        } catch (Exception e) {
+            return "Unable to mark attendance: " + e.getMessage();
+        }
+    }
+
+    // 2. Get All Attendance
+    public List<Attendance> getAllAttendance() {
+
+        try {
+            if (service == null) {
+                throw new IllegalStateException(
+                        "Server connection is unavailable.");
+            }
+
+            return service.getAllAttendance();
+
+        } catch (Exception e) {
+            throw new RuntimeException(
+                    "Unable to retrieve attendance: " + e.getMessage(), e);
+        }
+    }
+
+    // 3. Update Attendance
+    public String updateAttendance(Attendance attendance) {
+
+        try {
+            if (service == null) {
+                return "Server connection is unavailable.";
+            }
+
+            return service.updateAttendance(attendance);
+
+        } catch (Exception e) {
+            return "Unable to update attendance: " + e.getMessage();
+        }
+    }
+
+    // 4. Delete Attendance
+    public String deleteAttendance(int attendanceId) {
+
+        try {
+            if (service == null) {
+                return "Server connection is unavailable.";
+            }
+
+            return service.deleteAttendance(attendanceId);
+
+        } catch (Exception e) {
+            return "Unable to delete attendance: " + e.getMessage();
+        }
+    }
+
 }

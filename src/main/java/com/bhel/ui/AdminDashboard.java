@@ -3,9 +3,11 @@ package com.bhel.ui;
 
 import com.bhel.client.LoginFrame;
 import com.bhel.remote.HRMService;
+import com.bhel.client.HRMClient;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
+
 import java.awt.*;
 import java.rmi.Naming;
 
@@ -43,6 +45,7 @@ public class AdminDashboard extends JFrame {
         setLocationRelativeTo(null);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLayout(new BorderLayout());
+        KeyboardNavigation.installEscape(this, this::logout);
 
         connectToServer();
 
@@ -57,10 +60,13 @@ public class AdminDashboard extends JFrame {
     private void connectToServer() {
 
         try {
+
             hrmService = (HRMService) Naming.lookup(
-                    "rmi://localhost:1099/HRMService");
+                    "rmi://localhost:1099/HRMService"
+            );
 
         } catch (Exception e) {
+
             hrmService = null;
 
             SwingUtilities.invokeLater(() ->
@@ -94,7 +100,8 @@ public class AdminDashboard extends JFrame {
         JPanel brandPanel = new JPanel();
         brandPanel.setOpaque(false);
         brandPanel.setLayout(
-                new BoxLayout(brandPanel, BoxLayout.Y_AXIS));
+                new BoxLayout(brandPanel, BoxLayout.Y_AXIS)
+        );
 
         brandPanel.add(title);
         brandPanel.add(Box.createVerticalStrut(3));
@@ -143,7 +150,8 @@ public class AdminDashboard extends JFrame {
 
         menuPanel.setBackground(NAVY);
         menuPanel.setLayout(
-                new BoxLayout(menuPanel, BoxLayout.Y_AXIS));
+                new BoxLayout(menuPanel, BoxLayout.Y_AXIS)
+        );
 
         JLabel menuTitle = new JLabel("ADMIN MENU");
         menuTitle.setFont(new Font("Segoe UI", Font.BOLD, 12));
@@ -152,21 +160,30 @@ public class AdminDashboard extends JFrame {
 
         menuPanel.add(menuTitle);
 
-        addMenuItem(menuPanel, "Dashboard", this::showDashboard);
+        addMenuItem(menuPanel, "Dashboard",
+                this::showDashboard);
+
         addMenuItem(menuPanel, "Employee Management",
                 this::openEmployeeManagement);
+
         addMenuItem(menuPanel, "Register Employee",
                 this::openRegistration);
+
         addMenuItem(menuPanel, "Leave Management",
                 this::openLeaveManagement);
+
         addMenuItem(menuPanel, "Employee Reports",
                 this::openReports);
+
         addMenuItem(menuPanel, "Department Management",
                 this::openDepartmentManagement);
+
         addMenuItem(menuPanel, "Attendance Management",
-                () -> showMessage("Attendance Management"));
+                this::openAttendanceManagement);
+
+        // SYSTEM SETTINGS
         addMenuItem(menuPanel, "System Settings",
-                () -> showMessage("System Settings"));
+                this::openSystemSettings);
 
         JPanel logoutPanel = new JPanel(new BorderLayout());
 
@@ -225,7 +242,8 @@ public class AdminDashboard extends JFrame {
         button.setCursor(new Cursor(Cursor.HAND_CURSOR));
 
         button.setMaximumSize(
-                new Dimension(Integer.MAX_VALUE, 48));
+                new Dimension(Integer.MAX_VALUE, 48)
+        );
 
         button.setAlignmentX(Component.LEFT_ALIGNMENT);
 
@@ -238,22 +256,28 @@ public class AdminDashboard extends JFrame {
 
         contentPanel.removeAll();
 
-        JPanel dashboard = new JPanel(new BorderLayout(20, 25));
+        JPanel dashboard = new JPanel(
+                new BorderLayout(20, 25)
+        );
+
         dashboard.setBackground(LIGHT_BG);
 
         // Heading
 
         JPanel headingPanel = new JPanel();
+
         headingPanel.setBackground(LIGHT_BG);
         headingPanel.setLayout(
-                new BoxLayout(headingPanel, BoxLayout.Y_AXIS));
+                new BoxLayout(headingPanel, BoxLayout.Y_AXIS)
+        );
 
         JLabel heading = new JLabel("Admin Dashboard");
         heading.setFont(new Font("Segoe UI", Font.BOLD, 28));
         heading.setForeground(NAVY);
 
         JLabel subtitle = new JLabel(
-                "Manage employees, leave requests and HR activities.");
+                "Manage employees, leave requests and HR activities."
+        );
 
         subtitle.setFont(new Font("Segoe UI", Font.PLAIN, 14));
         subtitle.setForeground(TEXT_GRAY);
@@ -265,9 +289,11 @@ public class AdminDashboard extends JFrame {
         // Dashboard content
 
         JPanel dashboardBody = new JPanel();
+
         dashboardBody.setBackground(LIGHT_BG);
         dashboardBody.setLayout(
-                new BoxLayout(dashboardBody, BoxLayout.Y_AXIS));
+                new BoxLayout(dashboardBody, BoxLayout.Y_AXIS)
+        );
 
         // Statistics heading
 
@@ -281,7 +307,8 @@ public class AdminDashboard extends JFrame {
         // Statistics cards
 
         JPanel statsPanel = new JPanel(
-                new GridLayout(1, 3, 18, 18));
+                new GridLayout(1, 3, 18, 18)
+        );
 
         statsPanel.setBackground(LIGHT_BG);
 
@@ -290,15 +317,18 @@ public class AdminDashboard extends JFrame {
 
         statsPanel.add(createStatCard(
                 "Total Employees",
-                totalEmployeesValue));
+                totalEmployeesValue
+        ));
 
         statsPanel.add(createStatCard(
                 "Pending Leave Requests",
-                pendingLeavesValue));
+                pendingLeavesValue
+        ));
 
         statsPanel.add(createStatCard(
                 "HR Modules",
-                new JLabel("8")));
+                new JLabel("8")
+        ));
 
         dashboardBody.add(statsPanel);
         dashboardBody.add(Box.createVerticalStrut(30));
@@ -313,45 +343,51 @@ public class AdminDashboard extends JFrame {
         dashboardBody.add(Box.createVerticalStrut(18));
 
         JPanel actionsPanel = new JPanel(
-                new GridLayout(2, 3, 15, 15));
+                new GridLayout(2, 3, 15, 15)
+        );
 
         actionsPanel.setBackground(LIGHT_BG);
 
         actionsPanel.add(createActionCard(
                 "Register Employee",
                 "Add a new employee",
-                this::openRegistration));
+                this::openRegistration
+        ));
 
         actionsPanel.add(createActionCard(
                 "Manage Employees",
                 "View and manage employee records",
-                this::openEmployeeManagement));
+                this::openEmployeeManagement
+        ));
 
         actionsPanel.add(createActionCard(
                 "Leave Management",
                 "Review employee leave requests",
-                this::openLeaveManagement));
+                this::openLeaveManagement
+        ));
 
         actionsPanel.add(createActionCard(
                 "Employee Reports",
                 "View employee reports",
-                this::openReports));
-
-        // UPDATED DEPARTMENT QUICK ACTION
+                this::openReports
+        ));
 
         actionsPanel.add(createActionCard(
                 "Departments",
                 "Manage department information",
-                this::openDepartmentManagement));
+                this::openDepartmentManagement
+        ));
 
         actionsPanel.add(createActionCard(
                 "Attendance",
                 "Manage employee attendance",
-                () -> showMessage("Attendance Management")));
+                this::openAttendanceManagement
+        ));
 
         dashboardBody.add(actionsPanel);
 
         JScrollPane scrollPane = new JScrollPane(dashboardBody);
+
         scrollPane.setBorder(null);
         scrollPane.setBackground(LIGHT_BG);
         scrollPane.getViewport().setBackground(LIGHT_BG);
@@ -375,22 +411,28 @@ public class AdminDashboard extends JFrame {
             JLabel valueLabel) {
 
         JPanel card = new JPanel();
+
         card.setBackground(WHITE);
 
         card.setLayout(
-                new BoxLayout(card, BoxLayout.Y_AXIS));
+                new BoxLayout(card, BoxLayout.Y_AXIS)
+        );
 
         card.setBorder(
                 BorderFactory.createCompoundBorder(
                         BorderFactory.createLineBorder(BORDER),
-                        new EmptyBorder(22, 20, 22, 20)));
+                        new EmptyBorder(22, 20, 22, 20)
+                )
+        );
 
         JLabel titleLabel = new JLabel(title);
         titleLabel.setFont(new Font("Segoe UI", Font.PLAIN, 14));
         titleLabel.setForeground(TEXT_GRAY);
 
         valueLabel.setFont(
-                new Font("Segoe UI", Font.BOLD, 32));
+                new Font("Segoe UI", Font.BOLD, 32)
+        );
+
         valueLabel.setForeground(NAVY);
 
         card.add(titleLabel);
@@ -408,35 +450,46 @@ public class AdminDashboard extends JFrame {
             Runnable action) {
 
         JButton card = new JButton();
+
         card.setLayout(new BorderLayout(10, 12));
         card.setBackground(WHITE);
 
         card.setBorder(
                 BorderFactory.createCompoundBorder(
                         BorderFactory.createLineBorder(BORDER),
-                        new EmptyBorder(22, 18, 22, 18)));
+                        new EmptyBorder(22, 18, 22, 18)
+                )
+        );
 
         card.setFocusPainted(false);
         card.setCursor(new Cursor(Cursor.HAND_CURSOR));
 
         JLabel cardTitle = new JLabel(title);
+
         cardTitle.setFont(
-                new Font("Segoe UI", Font.BOLD, 17));
+                new Font("Segoe UI", Font.BOLD, 17)
+        );
+
         cardTitle.setForeground(NAVY);
 
         JLabel cardDescription = new JLabel(
                 "<html><div style='width:180px;'>"
                         + description
-                        + "</div></html>");
+                        + "</div></html>"
+        );
 
         cardDescription.setFont(
-                new Font("Segoe UI", Font.PLAIN, 12));
+                new Font("Segoe UI", Font.PLAIN, 12)
+        );
+
         cardDescription.setForeground(TEXT_GRAY);
 
         JPanel textPanel = new JPanel();
+
         textPanel.setOpaque(false);
         textPanel.setLayout(
-                new BoxLayout(textPanel, BoxLayout.Y_AXIS));
+                new BoxLayout(textPanel, BoxLayout.Y_AXIS)
+        );
 
         textPanel.add(cardTitle);
         textPanel.add(Box.createVerticalStrut(10));
@@ -467,9 +520,11 @@ public class AdminDashboard extends JFrame {
 
                 int pendingCount = 0;
 
-                for (Object leave : hrmService.getAllLeaveApplications()) {
+                for (Object leave :
+                        hrmService.getAllLeaveApplications()) {
 
                     try {
+
                         String status = (String) leave.getClass()
                                 .getMethod("getStatus")
                                 .invoke(leave);
@@ -480,29 +535,37 @@ public class AdminDashboard extends JFrame {
                         }
 
                     } catch (Exception ignored) {
-                        // Ignore an individual leave record if its
-                        // status cannot be read.
+                        // Ignore an individual leave record
+                        // if its status cannot be read.
                     }
                 }
 
-                return new int[]{employeeCount, pendingCount};
+                return new int[]{
+                        employeeCount,
+                        pendingCount
+                };
             }
 
             @Override
             protected void done() {
 
                 try {
+
                     int[] stats = get();
 
                     totalEmployeesValue.setText(
-                            String.valueOf(stats[0]));
+                            String.valueOf(stats[0])
+                    );
 
                     pendingLeavesValue.setText(
-                            String.valueOf(stats[1]));
+                            String.valueOf(stats[1])
+                    );
 
                 } catch (Exception e) {
+
                     totalEmployeesValue.setText("N/A");
                     pendingLeavesValue.setText("N/A");
+
                     e.printStackTrace();
                 }
             }
@@ -540,7 +603,7 @@ public class AdminDashboard extends JFrame {
         }
 
         LeaveManagementFrame frame =
-                new LeaveManagementFrame(hrmService);
+                new LeaveManagementFrame(hrmService, username);
 
         frame.setVisible(true);
     }
@@ -573,6 +636,36 @@ public class AdminDashboard extends JFrame {
         frame.setVisible(true);
     }
 
+    // ================= ATTENDANCE MANAGEMENT =================
+
+    private void openAttendanceManagement() {
+
+        if (!checkConnection()) {
+            return;
+        }
+
+        HRMClient hrmClient = new HRMClient();
+
+        AttendanceManagementFrame frame =
+                new AttendanceManagementFrame(hrmClient);
+
+        frame.setVisible(true);
+    }
+
+    // ================= SYSTEM SETTINGS =================
+
+    private void openSystemSettings() {
+
+        if (!checkConnection()) {
+            return;
+        }
+
+        SystemSettingsFrame frame =
+                new SystemSettingsFrame(hrmService, username);
+
+        frame.setVisible(true);
+    }
+
     // ================= CONNECTION CHECK =================
 
     private boolean checkConnection() {
@@ -583,7 +676,8 @@ public class AdminDashboard extends JFrame {
                     this,
                     "HRM server is not connected.",
                     "Connection Error",
-                    JOptionPane.ERROR_MESSAGE);
+                    JOptionPane.ERROR_MESSAGE
+            );
 
             return false;
         }
@@ -599,7 +693,8 @@ public class AdminDashboard extends JFrame {
                 this,
                 feature + " module will be connected to the HRM server next.",
                 "BHEL HRM",
-                JOptionPane.INFORMATION_MESSAGE);
+                JOptionPane.INFORMATION_MESSAGE
+        );
     }
 
     // ================= LOGOUT =================
@@ -610,7 +705,8 @@ public class AdminDashboard extends JFrame {
                 this,
                 "Are you sure you want to logout?",
                 "Confirm Logout",
-                JOptionPane.YES_NO_OPTION);
+                JOptionPane.YES_NO_OPTION
+        );
 
         if (result == JOptionPane.YES_OPTION) {
 

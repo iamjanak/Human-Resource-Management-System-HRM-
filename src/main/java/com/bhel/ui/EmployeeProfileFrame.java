@@ -11,6 +11,7 @@ import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.util.ArrayList;
 import java.util.List;
+import java.time.LocalDate;
 
 public class EmployeeProfileFrame extends JFrame {
 
@@ -28,7 +29,19 @@ public class EmployeeProfileFrame extends JFrame {
     private JTextField firstNameField;
     private JTextField lastNameField;
     private JTextField icPassportField;
+    private JTextField employeeIdField;
+    private JTextField userIdField;
+    private JTextField createdAtField;
     private JTextField usernameField;
+    private JComboBox<String> genderField;
+    private JTextField dateOfBirthField;
+    private JTextField phoneField;
+    private JTextField emailField;
+    private JTextField addressField;
+    private JTextField departmentField;
+    private JTextField designationField;
+    private JTextField joiningDateField;
+    private JComboBox<String> employmentStatusField;
 
     private DefaultTableModel tableModel;
     private JTable familyTable;
@@ -47,6 +60,7 @@ public class EmployeeProfileFrame extends JFrame {
         setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
 
         setLayout(new BorderLayout());
+        KeyboardNavigation.installEscape(this, this::dispose);
         getContentPane().setBackground(BG);
 
         add(buildHeader(), BorderLayout.NORTH);
@@ -131,21 +145,44 @@ public class EmployeeProfileFrame extends JFrame {
         heading.setFont(new Font("Segoe UI", Font.BOLD, 18));
         heading.setForeground(NAVY);
 
-        JPanel fields = new JPanel(new GridLayout(2, 2, 20, 15));
+        JPanel fields = new JPanel(new GridLayout(0, 2, 20, 15));
         fields.setOpaque(false);
 
+        employeeIdField = readOnlyField();
+        userIdField = readOnlyField();
+        createdAtField = readOnlyField();
         firstNameField = new JTextField();
         lastNameField = new JTextField();
         icPassportField = new JTextField();
-        usernameField = new JTextField();
+        usernameField = readOnlyField();
+        genderField = new JComboBox<>(new String[]{"", "Female", "Male", "Other"});
+        dateOfBirthField = new JTextField();
+        phoneField = new JTextField();
+        emailField = new JTextField();
+        addressField = new JTextField();
+        departmentField = readOnlyField();
+        designationField = readOnlyField();
+        joiningDateField = readOnlyField();
+        employmentStatusField = new JComboBox<>(new String[]{
+                "Active", "On Leave", "Resigned", "Terminated"});
+        employmentStatusField.setEnabled(false);
 
-        usernameField.setEditable(false);
-        usernameField.setBackground(new Color(235, 238, 242));
-
+        fields.add(createField("Employee ID", employeeIdField));
+        fields.add(createField("User ID", userIdField));
+        fields.add(createField("Created At", createdAtField));
         fields.add(createField("First Name", firstNameField));
         fields.add(createField("Last Name", lastNameField));
         fields.add(createField("IC / Passport Number", icPassportField));
         fields.add(createField("Username", usernameField));
+        fields.add(createField("Gender", genderField));
+        fields.add(createField("Date of Birth (YYYY-MM-DD)", dateOfBirthField));
+        fields.add(createField("Phone", phoneField));
+        fields.add(createField("Email", emailField));
+        fields.add(createField("Address", addressField));
+        fields.add(createField("Department (HR managed)", departmentField));
+        fields.add(createField("Designation (HR managed)", designationField));
+        fields.add(createField("Joining Date", joiningDateField));
+        fields.add(createField("Employment Status", employmentStatusField));
 
         JButton updateButton = new JButton("Save Profile");
 
@@ -261,10 +298,28 @@ public class EmployeeProfileFrame extends JFrame {
 
             employee = updatedEmployee;
 
+            employeeIdField.setText(String.valueOf(employee.getEmployeeId()));
+            userIdField.setText(String.valueOf(employee.getUserId()));
+            createdAtField.setText(employee.getCreatedAt() == null
+                    ? "" : employee.getCreatedAt().toString());
             firstNameField.setText(employee.getFirstName());
             lastNameField.setText(employee.getLastName());
             icPassportField.setText(employee.getIcPassport());
             usernameField.setText(employee.getUsername());
+            genderField.setSelectedItem(employee.getGender() == null
+                    ? "" : employee.getGender());
+            dateOfBirthField.setText(employee.getDateOfBirth() == null
+                    ? "" : employee.getDateOfBirth().toString());
+            phoneField.setText(employee.getPhone());
+            emailField.setText(employee.getEmail());
+            addressField.setText(employee.getAddress());
+            departmentField.setText(employee.getDepartment());
+            designationField.setText(employee.getDesignation());
+            joiningDateField.setText(employee.getJoiningDate() == null
+                    ? "" : employee.getJoiningDate().toString());
+            employmentStatusField.setSelectedItem(
+                    employee.getEmploymentStatus() == null
+                            ? "Active" : employee.getEmploymentStatus());
 
         } catch (Exception e) {
 
@@ -284,6 +339,15 @@ public class EmployeeProfileFrame extends JFrame {
         String firstName = firstNameField.getText().trim();
         String lastName = lastNameField.getText().trim();
         String icPassport = icPassportField.getText().trim();
+        LocalDate dateOfBirth;
+        try {
+            dateOfBirth = parseOptionalDate(dateOfBirthField.getText());
+        } catch (java.time.format.DateTimeParseException e) {
+            JOptionPane.showMessageDialog(this,
+                    "Date of birth must use YYYY-MM-DD format.",
+                    "Invalid Date", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
 
         if (firstName.isEmpty()
                 || lastName.isEmpty()
@@ -303,7 +367,16 @@ public class EmployeeProfileFrame extends JFrame {
                     employeeId,
                     firstName,
                     lastName,
-                    icPassport
+                    icPassport,
+                    (String) genderField.getSelectedItem(),
+                    dateOfBirth,
+                    phoneField.getText().trim(),
+                    emailField.getText().trim(),
+                    addressField.getText().trim(),
+                    departmentField.getText().trim(),
+                    designationField.getText().trim(),
+                    parseOptionalDate(joiningDateField.getText()),
+                    (String) employmentStatusField.getSelectedItem()
             );
 
             JOptionPane.showMessageDialog(this, result);
@@ -614,7 +687,7 @@ public class EmployeeProfileFrame extends JFrame {
 
     private JPanel createField(
             String label,
-            JTextField field) {
+            JComponent field) {
 
         JPanel panel = new JPanel();
 
@@ -637,6 +710,18 @@ public class EmployeeProfileFrame extends JFrame {
         panel.add(field);
 
         return panel;
+    }
+
+    private JTextField readOnlyField() {
+        JTextField field = new JTextField();
+        field.setEditable(false);
+        field.setBackground(new Color(235, 238, 242));
+        return field;
+    }
+
+    private LocalDate parseOptionalDate(String value) {
+        String trimmed = value == null ? "" : value.trim();
+        return trimmed.isEmpty() ? null : LocalDate.parse(trimmed);
     }
 
     private void styleButton(JButton button, Color color) {

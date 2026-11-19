@@ -9,9 +9,13 @@ import com.bhel.model.FamilyMember;
 import com.bhel.model.LeaveApplication;
 import java.sql.Date;
 import java.time.LocalDate;
+import java.time.Instant;
 import com.bhel.model.Employee;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.rmi.Naming;
 import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
@@ -19,10 +23,19 @@ import java.rmi.server.UnicastRemoteObject;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.Timestamp;
 import java.util.concurrent.CountDownLatch;
 import com.bhel.model.Department;
+import com.bhel.model.Attendance;
+import java.sql.Time;
+import java.time.LocalTime;
 
 public class HRMServer extends UnicastRemoteObject implements HRMService {
+
+    private final Map<String, AttendanceSession> attendanceSessions =
+            new ConcurrentHashMap<>();
+
+    private record AttendanceSession(int employeeId, Instant expiresAt) { }
 
     public HRMServer() throws RemoteException {
         super();
@@ -86,8 +99,11 @@ public class HRMServer extends UnicastRemoteObject implements HRMService {
 public Employee loginEmployee(String username, String password)
         throws RemoteException {
 
-    String sql = "SELECT e.employee_id, e.first_name, "
-            + "e.last_name, e.ic_passport, u.username, "
+    String sql = "SELECT e.employee_id, e.user_id, e.created_at, "
+            + "e.first_name, e.last_name, e.ic_passport, e.gender, "
+            + "e.date_of_birth, e.phone, e.email, e.address, "
+            + "e.department, e.designation, e.joining_date, "
+            + "e.employment_status, u.username, "
             + "u.password_hash "
             + "FROM users u "
             + "JOIN employees e ON u.user_id = e.user_id "
@@ -113,14 +129,12 @@ public Employee loginEmployee(String username, String password)
                                 password, storedHash);
 
                 if (passwordValid) {
-
-                    return new Employee(
-                            result.getInt("employee_id"),
-                            result.getString("first_name"),
-                            result.getString("last_name"),
-                            result.getString("ic_passport"),
-                            result.getString("username")
-                    );
+                    Employee employee = mapEmployee(result);
+                    String token = UUID.randomUUID().toString();
+                    attendanceSessions.put(token, new AttendanceSession(
+                            employee.getEmployeeId(), Instant.now().plusSeconds(24 * 60 * 60)));
+                    employee.setAttendanceSessionToken(token);
+                    return employee;
                 }
             }
 
@@ -136,12 +150,142 @@ public Employee loginEmployee(String username, String password)
                 "Employee login failed.", e);
     }
 }
+
+    // CHANGE ACCOUNT PASSWORD
+    @Override
+    public String changePassword(String username, String currentPassword,
+                                 String newPassword) throws RemoteException {
+
+        if (username == null || username.trim().isEmpty()
+                || currentPassword == null || currentPassword.isEmpty()
+                || newPassword == null || newPassword.isEmpty()) {
+            return "Username and all password fields are required.";
+        }
+
+        String selectSql = "SELECT user_id, password_hash FROM users "
+                + "WHERE username = ? AND is_active = TRUE";
+        String updateSql = "UPDATE users SET password_hash = ? "
+                + "WHERE user_id = ? AND is_active = TRUE";
+
+        try (Connection connection = DBConnection.getConnection()) {
+            connection.setAutoCommit(false);
+            try {
+                int userId;
+                String storedHash;
+                try (PreparedStatement statement =
+                             connection.prepareStatement(selectSql)) {
+                    statement.setString(1, username.trim());
+                    try (ResultSet result = statement.executeQuery()) {
+                        if (!result.next()) {
+                            connection.rollback();
+                            return "Account not found or inactive.";
+                        }
+                        userId = result.getInt("user_id");
+                        storedHash = result.getString("password_hash");
+                    }
+                }
+
+                if (!PasswordUtil.verifyPassword(currentPassword, storedHash)) {
+                    connection.rollback();
+                    return "Current password is incorrect.";
+                }
+
+                String newHash = PasswordUtil.hashPassword(newPassword);
+                try (PreparedStatement statement =
+                             connection.prepareStatement(updateSql)) {
+                    statement.setString(1, newHash);
+                    statement.setInt(2, userId);
+                    if (statement.executeUpdate() != 1) {
+                        connection.rollback();
+                        return "Password was not changed. Please try again.";
+                    }
+                }
+
+                connection.commit();
+                return "Password changed successfully.";
+            } catch (Exception e) {
+                connection.rollback();
+                throw e;
+            } finally {
+                connection.setAutoCommit(true);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            return "Password change failed: " + e.getMessage();
+        }
+    }
+
+    // HR RESET FOR AN EMPLOYEE WHO CANNOT SIGN IN
+    @Override
+    public String adminResetEmployeePassword(String adminUsername,
+                                             String adminPassword,
+                                             String employeeUsername,
+                                             String newPassword)
+            throws RemoteException {
+
+        if (adminUsername == null || adminUsername.trim().isEmpty()
+                || adminPassword == null || adminPassword.isEmpty()
+                || employeeUsername == null
+                || employeeUsername.trim().isEmpty()
+                || newPassword == null || newPassword.isEmpty()) {
+            return "HR credentials, employee username, and new password are required.";
+        }
+
+        String adminSql = "SELECT password_hash FROM users "
+                + "WHERE username = ? AND role = 'ADMIN_HR' "
+                + "AND is_active = TRUE";
+        String updateSql = "UPDATE users SET password_hash = ? "
+                + "WHERE username = ? AND role = 'EMPLOYEE' "
+                + "AND is_active = TRUE";
+
+        try (Connection connection = DBConnection.getConnection()) {
+            String adminHash;
+            try (PreparedStatement statement =
+                         connection.prepareStatement(adminSql)) {
+                statement.setString(1, adminUsername.trim());
+                try (ResultSet result = statement.executeQuery()) {
+                    if (!result.next()) {
+                        return "HR account was not found or is inactive.";
+                    }
+                    adminHash = result.getString("password_hash");
+                }
+            }
+
+            if (!PasswordUtil.verifyPassword(adminPassword, adminHash)) {
+                return "HR password is incorrect.";
+            }
+
+            String newHash = PasswordUtil.hashPassword(newPassword);
+            try (PreparedStatement statement =
+                         connection.prepareStatement(updateSql)) {
+                statement.setString(1, newHash);
+                statement.setString(2, employeeUsername.trim());
+                int updated = statement.executeUpdate();
+                return updated > 0
+                        ? "Employee password reset successfully. Give the employee the new password securely."
+                        : "Active employee account was not found.";
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            return "Employee password reset failed: " + e.getMessage();
+        }
+    }
+
     // REGISTER EMPLOYEE
     @Override
     public String registerEmployee(
             String firstName,
             String lastName,
             String icPassport,
+            String gender,
+            LocalDate dateOfBirth,
+            String phone,
+            String email,
+            String address,
+            String department,
+            String designation,
+            LocalDate joiningDate,
+            String employmentStatus,
             String username,
             String password) throws RemoteException {
 
@@ -157,8 +301,11 @@ public Employee loginEmployee(String username, String password)
 
         String employeeSql =
                 "INSERT INTO employees "
-                + "(first_name, last_name, ic_passport, user_id) "
-                + "VALUES (?, ?, ?, ?)";
+                + "(first_name, last_name, ic_passport, gender, "
+                + "date_of_birth, phone, email, address, department, "
+                + "designation, joining_date, employment_status, user_id, "
+                + "created_at) "
+                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)";
 
         try (Connection connection = DBConnection.getConnection()) {
 
@@ -224,7 +371,19 @@ public Employee loginEmployee(String username, String password)
                     statement.setString(1, firstName);
                     statement.setString(2, lastName);
                     statement.setString(3, icPassport);
-                    statement.setInt(4, userId);
+                    statement.setString(4, blankToNull(gender));
+                    setSqlDate(statement, 5, dateOfBirth);
+                    statement.setString(6, blankToNull(phone));
+                    statement.setString(7, blankToNull(email));
+                    statement.setString(8, blankToNull(address));
+                    statement.setString(9, blankToNull(department));
+                    statement.setString(10, blankToNull(designation));
+                    setSqlDate(statement, 11, joiningDate);
+                    statement.setString(12,
+                            employmentStatus == null
+                                    || employmentStatus.trim().isEmpty()
+                                    ? "Active" : employmentStatus.trim());
+                    statement.setInt(13, userId);
 
                     statement.executeUpdate();
                 }
@@ -257,7 +416,6 @@ public Employee loginEmployee(String username, String password)
     public static void main(String[] args) {
 
         try {
-
             HRMServer server = new HRMServer();
 
             LocateRegistry.createRegistry(1099);
@@ -277,6 +435,49 @@ public Employee loginEmployee(String username, String password)
             e.printStackTrace();
         }
     }
+
+    private Employee mapEmployee(ResultSet result)
+            throws java.sql.SQLException {
+        Timestamp createdAt = result.getTimestamp("created_at");
+        Date dateOfBirth = result.getDate("date_of_birth");
+        Date joiningDate = result.getDate("joining_date");
+
+        return new Employee(
+                result.getInt("employee_id"),
+                result.getInt("user_id"),
+                result.getString("first_name"),
+                result.getString("last_name"),
+                result.getString("ic_passport"),
+                result.getString("username"),
+                createdAt == null ? null : createdAt.toLocalDateTime(),
+                result.getString("gender"),
+                dateOfBirth == null ? null : dateOfBirth.toLocalDate(),
+                result.getString("phone"),
+                result.getString("email"),
+                result.getString("address"),
+                result.getString("department"),
+                result.getString("designation"),
+                joiningDate == null ? null : joiningDate.toLocalDate(),
+                result.getString("employment_status"));
+    }
+
+
+    private static String blankToNull(String value) {
+        return value == null || value.trim().isEmpty()
+                ? null : value.trim();
+    }
+
+
+    private static void setSqlDate(PreparedStatement statement,
+                                   int parameterIndex,
+                                   LocalDate value)
+            throws java.sql.SQLException {
+        if (value == null) {
+            statement.setNull(parameterIndex, java.sql.Types.DATE);
+        } else {
+            statement.setDate(parameterIndex, Date.valueOf(value));
+        }
+    }
     
     // GET ALL EMPLOYEES
     @Override
@@ -284,8 +485,11 @@ public Employee loginEmployee(String username, String password)
 
         List<Employee> employees = new ArrayList<>();
 
-        String sql = "SELECT e.employee_id, e.first_name, "
-                + "e.last_name, e.ic_passport, u.username "
+        String sql = "SELECT e.employee_id, e.user_id, e.created_at, "
+                + "e.first_name, e.last_name, e.ic_passport, e.gender, "
+                + "e.date_of_birth, e.phone, e.email, e.address, "
+                + "e.department, e.designation, e.joining_date, "
+                + "e.employment_status, u.username "
                 + "FROM employees e "
                 + "JOIN users u ON e.user_id = u.user_id "
                 + "ORDER BY e.employee_id";
@@ -297,15 +501,7 @@ public Employee loginEmployee(String username, String password)
 
             while (result.next()) {
 
-                Employee employee = new Employee(
-                        result.getInt("employee_id"),
-                        result.getString("first_name"),
-                        result.getString("last_name"),
-                        result.getString("ic_passport"),
-                        result.getString("username")
-                );
-
-                employees.add(employee);
+                employees.add(mapEmployee(result));
             }
 
             return employees;
@@ -326,7 +522,22 @@ public Employee loginEmployee(String username, String password)
             int employeeId,
             String firstName,
             String lastName,
-            String icPassport) throws RemoteException {
+            String icPassport,
+            String gender,
+            LocalDate dateOfBirth,
+            String phone,
+            String email,
+            String address,
+            String department,
+            String designation,
+            LocalDate joiningDate,
+            String employmentStatus) throws RemoteException {
+
+        if (employeeId <= 0 || firstName == null || firstName.trim().isEmpty()
+                || lastName == null || lastName.trim().isEmpty()
+                || icPassport == null || icPassport.trim().isEmpty()) {
+            return "Employee ID, first name, last name, and IC/Passport are required.";
+        }
 
         String checkSql =
                 "SELECT employee_id FROM employees "
@@ -334,7 +545,10 @@ public Employee loginEmployee(String username, String password)
 
         String updateSql =
                 "UPDATE employees "
-                + "SET first_name = ?, last_name = ?, ic_passport = ? "
+                + "SET first_name = ?, last_name = ?, ic_passport = ?, "
+                + "gender = ?, date_of_birth = ?, phone = ?, email = ?, "
+                + "address = ?, department = ?, designation = ?, "
+                + "joining_date = ?, employment_status = ? "
                 + "WHERE employee_id = ?";
 
         try (Connection connection = DBConnection.getConnection()) {
@@ -361,7 +575,19 @@ public Employee loginEmployee(String username, String password)
                 statement.setString(1, firstName);
                 statement.setString(2, lastName);
                 statement.setString(3, icPassport);
-                statement.setInt(4, employeeId);
+                statement.setString(4, blankToNull(gender));
+                setSqlDate(statement, 5, dateOfBirth);
+                statement.setString(6, blankToNull(phone));
+                statement.setString(7, blankToNull(email));
+                statement.setString(8, blankToNull(address));
+                statement.setString(9, blankToNull(department));
+                statement.setString(10, blankToNull(designation));
+                setSqlDate(statement, 11, joiningDate);
+                statement.setString(12,
+                        employmentStatus == null
+                                || employmentStatus.trim().isEmpty()
+                                ? "Active" : employmentStatus.trim());
+                statement.setInt(13, employeeId);
 
                 int rowsUpdated = statement.executeUpdate();
 
@@ -422,7 +648,6 @@ public Employee loginEmployee(String username, String password)
         }
     }
 
-
     // GET EMPLOYEE LEAVE APPLICATIONS
     @Override
     public List<LeaveApplication> getEmployeeLeaves(int employeeId)
@@ -459,6 +684,9 @@ public Employee loginEmployee(String username, String password)
                     leave.setReason(result.getString("reason"));
                     leave.setStatus(result.getString("status"));
                     leave.setReviewedBy(result.getString("reviewed_by"));
+                    Timestamp appliedDate = result.getTimestamp("applied_date");
+                    leave.setAppliedDate(appliedDate == null
+                            ? null : appliedDate.toLocalDateTime());
 
                     leaves.add(leave);
                 }
@@ -482,8 +710,10 @@ public Employee loginEmployee(String username, String password)
 
         List<LeaveApplication> leaves = new ArrayList<>();
 
-        String sql = "SELECT * FROM leave_applications "
-                + "ORDER BY applied_date DESC";
+        String sql = "SELECT la.*, e.first_name, e.last_name "
+                + "FROM leave_applications la "
+                + "JOIN employees e ON la.employee_id = e.employee_id "
+                + "ORDER BY la.applied_date DESC";
 
         try (Connection connection = DBConnection.getConnection();
              PreparedStatement statement =
@@ -496,6 +726,9 @@ public Employee loginEmployee(String username, String password)
 
                 leave.setLeaveId(result.getInt("leave_id"));
                 leave.setEmployeeId(result.getInt("employee_id"));
+                leave.setEmployeeName(
+                        (result.getString("first_name") + " "
+                                + result.getString("last_name")).trim());
                 leave.setLeaveType(result.getString("leave_type"));
 
                 leave.setStartDate(
@@ -507,6 +740,9 @@ public Employee loginEmployee(String username, String password)
                 leave.setReason(result.getString("reason"));
                 leave.setStatus(result.getString("status"));
                 leave.setReviewedBy(result.getString("reviewed_by"));
+                Timestamp appliedDate = result.getTimestamp("applied_date");
+                leave.setAppliedDate(appliedDate == null
+                        ? null : appliedDate.toLocalDateTime());
 
                 leaves.add(leave);
             }
@@ -535,18 +771,29 @@ public Employee loginEmployee(String username, String password)
             return "Invalid leave status.";
         }
 
+        if (reviewedBy == null || reviewedBy.trim().isEmpty()) {
+            return "Reviewing HR username is required.";
+        }
+
+        String finalStatus = "Approved".equalsIgnoreCase(status)
+                ? "Approved" : "Rejected";
+
         String sql = "UPDATE leave_applications "
                 + "SET status = ?, reviewed_by = ?, "
                 + "reviewed_date = CURRENT_TIMESTAMP "
-                + "WHERE leave_id = ? AND status = 'Pending'";
+                + "WHERE leave_id = ? AND status = 'Pending' "
+                + "AND EXISTS (SELECT 1 FROM users u "
+                + "WHERE u.username = ? AND u.role = 'ADMIN_HR' "
+                + "AND u.is_active = TRUE)";
 
         try (Connection connection = DBConnection.getConnection();
              PreparedStatement statement =
                      connection.prepareStatement(sql)) {
 
-            statement.setString(1, status);
-            statement.setString(2, reviewedBy);
+            statement.setString(1, finalStatus);
+            statement.setString(2, reviewedBy.trim());
             statement.setInt(3, leaveId);
+            statement.setString(4, reviewedBy.trim());
 
             int rowsUpdated = statement.executeUpdate();
 
@@ -555,7 +802,7 @@ public Employee loginEmployee(String username, String password)
                         + " successfully!";
             }
 
-            return "Leave application not found or already reviewed.";
+            return "Request not found, already reviewed, or HR account is invalid.";
 
         } catch (Exception e) {
             e.printStackTrace();
@@ -576,8 +823,11 @@ public Employee loginEmployee(String username, String password)
     public Employee getEmployeeById(int employeeId)
             throws RemoteException {
 
-        String sql = "SELECT e.employee_id, e.first_name, "
-                + "e.last_name, e.ic_passport, u.username "
+        String sql = "SELECT e.employee_id, e.user_id, e.created_at, "
+                + "e.first_name, e.last_name, e.ic_passport, e.gender, "
+                + "e.date_of_birth, e.phone, e.email, e.address, "
+                + "e.department, e.designation, e.joining_date, "
+                + "e.employment_status, u.username "
                 + "FROM employees e "
                 + "JOIN users u ON e.user_id = u.user_id "
                 + "WHERE e.employee_id = ?";
@@ -591,13 +841,7 @@ public Employee loginEmployee(String username, String password)
             try (ResultSet result = statement.executeQuery()) {
 
                 if (result.next()) {
-                    return new Employee(
-                            result.getInt("employee_id"),
-                            result.getString("first_name"),
-                            result.getString("last_name"),
-                            result.getString("ic_passport"),
-                            result.getString("username")
-                    );
+                    return mapEmployee(result);
                 }
             }
 
@@ -981,5 +1225,434 @@ public Employee loginEmployee(String username, String password)
         }
     }
 
+    // ==========================================
+    // ATTENDANCE MANAGEMENT
+    // ==========================================
 
+    @Override
+    public String submitEmployeeAttendance(String attendanceSessionToken,
+                                           LocalTime checkIn,
+                                           LocalTime checkOut,
+                                           String remarks)
+            throws RemoteException {
+        int employeeId = requireAttendanceSession(attendanceSessionToken);
+        if (checkIn == null) return "Start Time is required.";
+        if (checkOut != null && checkOut.isBefore(checkIn)) {
+            return "End Time cannot be earlier than Start Time.";
+        }
+        if (remarks == null || remarks.isBlank()) return "Remarks are required.";
+
+        String employeeSql = "SELECT employment_status FROM employees "
+                + "WHERE employee_id = ? FOR UPDATE";
+        String existingSql = "SELECT attendance_id FROM attendance "
+                + "WHERE employee_id = ? AND attendance_date = CURRENT_DATE FOR UPDATE";
+        String insertSql = "INSERT INTO attendance "
+                + "(employee_id, attendance_date, check_in, check_out, status, remarks) "
+                + "VALUES (?, CURRENT_DATE, ?, ?, 'Present', ?)";
+        String updateSql = "UPDATE attendance SET check_in = ?, check_out = ?, remarks = ? "
+                + "WHERE attendance_id = ?";
+        try (Connection connection = DBConnection.getConnection()) {
+            connection.setAutoCommit(false);
+            try {
+                try (PreparedStatement statement = connection.prepareStatement(employeeSql)) {
+                    statement.setInt(1, employeeId);
+                    try (ResultSet result = statement.executeQuery()) {
+                        if (!result.next()) {
+                            connection.rollback();
+                            return "Employee record was not found.";
+                        }
+                        String employmentStatus = result.getString("employment_status");
+                        if (employmentStatus != null
+                                && !"active".equalsIgnoreCase(employmentStatus.trim())) {
+                            connection.rollback();
+                            return "Attendance cannot be submitted for an inactive employee.";
+                        }
+                    }
+                }
+
+                Integer attendanceId = null;
+                try (PreparedStatement statement = connection.prepareStatement(existingSql)) {
+                    statement.setInt(1, employeeId);
+                    try (ResultSet result = statement.executeQuery()) {
+                        if (result.next()) attendanceId = result.getInt("attendance_id");
+                    }
+                }
+                if (attendanceId == null) {
+                    try (PreparedStatement statement = connection.prepareStatement(insertSql)) {
+                        statement.setInt(1, employeeId);
+                        statement.setTime(2, Time.valueOf(checkIn));
+                        if (checkOut == null) statement.setNull(3, java.sql.Types.TIME);
+                        else statement.setTime(3, Time.valueOf(checkOut));
+                        statement.setString(4, "Employee entered: " + remarks.trim());
+                        statement.executeUpdate();
+                    }
+                } else {
+                    try (PreparedStatement statement = connection.prepareStatement(updateSql)) {
+                        statement.setTime(1, Time.valueOf(checkIn));
+                        if (checkOut == null) statement.setNull(2, java.sql.Types.TIME);
+                        else statement.setTime(2, Time.valueOf(checkOut));
+                        statement.setString(3, "Employee updated: " + remarks.trim());
+                        statement.setInt(4, attendanceId);
+                        statement.executeUpdate();
+                    }
+                }
+                connection.commit();
+                return "Attendance submitted successfully for today.";
+            } catch (java.sql.SQLException e) {
+                connection.rollback();
+                if ("23505".equals(e.getSQLState())) {
+                    return "Attendance is already recorded for today. Refresh and try again.";
+                }
+                throw e;
+            } catch (Exception e) {
+                connection.rollback();
+                throw e;
+            }
+        } catch (Exception e) {
+            throw new RemoteException("Unable to save employee attendance.", e);
+        }
+    }
+    @Override
+    public List<Attendance> getEmployeeAttendance(String attendanceSessionToken)
+            throws RemoteException {
+        int employeeId = requireAttendanceSession(attendanceSessionToken);
+        List<Attendance> records = new ArrayList<>();
+        String sql = "SELECT a.attendance_id, a.employee_id, e.first_name, e.last_name, "
+                + "a.attendance_date, a.check_in, a.check_out, a.status, a.remarks "
+                + "FROM attendance a JOIN employees e ON e.employee_id = a.employee_id "
+                + "WHERE a.employee_id = ? "
+                + "ORDER BY a.attendance_date DESC, a.attendance_id DESC";
+        try (Connection connection = DBConnection.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setInt(1, employeeId);
+            try (ResultSet result = statement.executeQuery()) {
+                while (result.next()) {
+                    Date date = result.getDate("attendance_date");
+                    Time checkIn = result.getTime("check_in");
+                    Time checkOut = result.getTime("check_out");
+                    String name = (valueOrEmpty(result.getString("first_name")) + " "
+                            + valueOrEmpty(result.getString("last_name"))).trim();
+                    records.add(new Attendance(
+                            result.getInt("attendance_id"), employeeId, name,
+                            date == null ? null : date.toLocalDate(),
+                            checkIn == null ? null : checkIn.toLocalTime(),
+                            checkOut == null ? null : checkOut.toLocalTime(),
+                            result.getString("status"), result.getString("remarks")));
+                }
+            }
+            return records;
+        } catch (Exception e) {
+            throw new RemoteException("Unable to retrieve employee attendance history.", e);
+        }
+    }
+
+    @Override
+    public void endEmployeeAttendanceSession(String attendanceSessionToken)
+            throws RemoteException {
+        requireAttendanceSession(attendanceSessionToken);
+        attendanceSessions.remove(attendanceSessionToken);
+    }
+
+    private int requireAttendanceSession(String token) throws RemoteException {
+        AttendanceSession session = token == null ? null : attendanceSessions.get(token);
+        if (session == null || !session.expiresAt().isAfter(Instant.now())) {
+            if (token != null) attendanceSessions.remove(token);
+            throw new RemoteException("Attendance session expired. Sign in again.");
+        }
+        return session.employeeId();
+    }
+
+    private static String valueOrEmpty(String value) {
+        return value == null ? "" : value;
+    }
+
+    // 1. MARK ATTENDANCE
+    @Override
+    public String markAttendance(Attendance attendance)
+            throws RemoteException {
+
+        if (attendance == null
+                || attendance.getEmployeeId() <= 0
+                || attendance.getAttendanceDate() == null
+                || attendance.getStatus() == null) {
+
+            return "Please provide valid attendance details.";
+        }
+
+        String status = attendance.getStatus().trim();
+
+        if (!status.equals("Present")
+                && !status.equals("Absent")
+                && !status.equals("Late")
+                && !status.equals("On Leave")) {
+
+            return "Invalid attendance status.";
+        }
+
+        if (attendance.getCheckIn() != null
+                && attendance.getCheckOut() != null
+                && attendance.getCheckOut()
+                        .isBefore(attendance.getCheckIn())) {
+
+            return "Check-out cannot be before check-in.";
+        }
+
+        String sql = "INSERT INTO attendance "
+                + "(employee_id, attendance_date, check_in, "
+                + "check_out, status, remarks) "
+                + "VALUES (?, ?, ?, ?, ?, ?)";
+
+        try (Connection connection = DBConnection.getConnection();
+             PreparedStatement statement =
+                     connection.prepareStatement(sql)) {
+
+            statement.setInt(1, attendance.getEmployeeId());
+
+            statement.setDate(
+                    2, Date.valueOf(attendance.getAttendanceDate()));
+
+            if (attendance.getCheckIn() != null) {
+                statement.setTime(
+                        3, Time.valueOf(attendance.getCheckIn()));
+            } else {
+                statement.setNull(3, java.sql.Types.TIME);
+            }
+
+            if (attendance.getCheckOut() != null) {
+                statement.setTime(
+                        4, Time.valueOf(attendance.getCheckOut()));
+            } else {
+                statement.setNull(4, java.sql.Types.TIME);
+            }
+
+            statement.setString(5, status);
+
+            statement.setString(
+                    6, attendance.getRemarks() == null
+                            ? "" : attendance.getRemarks().trim());
+
+            int rows = statement.executeUpdate();
+
+            return rows > 0
+                    ? "Attendance marked successfully!"
+                    : "Unable to mark attendance.";
+
+        } catch (java.sql.SQLException e) {
+
+            if ("23505".equals(e.getSQLState())) {
+                return "Attendance has already been marked "
+                        + "for this employee on this date.";
+            }
+
+            if ("23503".equals(e.getSQLState())) {
+                return "Employee ID does not exist.";
+            }
+
+            e.printStackTrace();
+
+            return "Attendance marking failed: " + e.getMessage();
+
+        } catch (Exception e) {
+
+            e.printStackTrace();
+
+            return "Attendance marking failed: " + e.getMessage();
+        }
+    }
+
+
+    // 2. GET ALL ATTENDANCE RECORDS
+    @Override
+    public List<Attendance> getAllAttendance()
+            throws RemoteException {
+
+        List<Attendance> attendanceList = new ArrayList<>();
+
+        String sql = "SELECT a.attendance_id, a.employee_id, "
+                + "e.first_name, e.last_name, "
+                + "a.attendance_date, a.check_in, a.check_out, "
+                + "a.status, a.remarks "
+                + "FROM attendance a "
+                + "JOIN employees e "
+                + "ON a.employee_id = e.employee_id "
+                + "ORDER BY a.attendance_date DESC, a.attendance_id DESC";
+
+        try (Connection connection = DBConnection.getConnection();
+             PreparedStatement statement =
+                     connection.prepareStatement(sql);
+             ResultSet result = statement.executeQuery()) {
+
+            while (result.next()) {
+
+                Date attendanceDate =
+                        result.getDate("attendance_date");
+
+                Time checkInTime =
+                        result.getTime("check_in");
+
+                Time checkOutTime =
+                        result.getTime("check_out");
+
+                String employeeName =
+                        result.getString("first_name") + " "
+                        + result.getString("last_name");
+
+                Attendance attendance = new Attendance(
+                        result.getInt("attendance_id"),
+                        result.getInt("employee_id"),
+                        employeeName,
+                        attendanceDate.toLocalDate(),
+                        checkInTime != null
+                                ? checkInTime.toLocalTime() : null,
+                        checkOutTime != null
+                                ? checkOutTime.toLocalTime() : null,
+                        result.getString("status"),
+                        result.getString("remarks")
+                );
+
+                attendanceList.add(attendance);
+            }
+
+            return attendanceList;
+
+        } catch (Exception e) {
+
+            e.printStackTrace();
+
+            throw new RemoteException(
+                    "Unable to retrieve attendance records.", e);
+        }
+    }
+
+
+    // 3. UPDATE ATTENDANCE
+    @Override
+    public String updateAttendance(Attendance attendance)
+            throws RemoteException {
+
+        if (attendance == null
+                || attendance.getAttendanceId() <= 0
+                || attendance.getEmployeeId() <= 0
+                || attendance.getAttendanceDate() == null
+                || attendance.getStatus() == null) {
+
+            return "Valid attendance details are required.";
+        }
+
+        String status = attendance.getStatus().trim();
+
+        if (!status.equals("Present")
+                && !status.equals("Absent")
+                && !status.equals("Late")
+                && !status.equals("On Leave")) {
+
+            return "Invalid attendance status.";
+        }
+
+        if (attendance.getCheckIn() != null
+                && attendance.getCheckOut() != null
+                && attendance.getCheckOut()
+                        .isBefore(attendance.getCheckIn())) {
+
+            return "Check-out cannot be before check-in.";
+        }
+
+        String sql = "UPDATE attendance "
+                + "SET employee_id = ?, attendance_date = ?, "
+                + "check_in = ?, check_out = ?, "
+                + "status = ?, remarks = ? "
+                + "WHERE attendance_id = ?";
+
+        try (Connection connection = DBConnection.getConnection();
+             PreparedStatement statement =
+                     connection.prepareStatement(sql)) {
+
+            statement.setInt(1, attendance.getEmployeeId());
+
+            statement.setDate(
+                    2, Date.valueOf(attendance.getAttendanceDate()));
+
+            if (attendance.getCheckIn() != null) {
+                statement.setTime(
+                        3, Time.valueOf(attendance.getCheckIn()));
+            } else {
+                statement.setNull(3, java.sql.Types.TIME);
+            }
+
+            if (attendance.getCheckOut() != null) {
+                statement.setTime(
+                        4, Time.valueOf(attendance.getCheckOut()));
+            } else {
+                statement.setNull(4, java.sql.Types.TIME);
+            }
+
+            statement.setString(5, status);
+
+            statement.setString(
+                    6, attendance.getRemarks() == null
+                            ? "" : attendance.getRemarks().trim());
+
+            statement.setInt(7, attendance.getAttendanceId());
+
+            int rows = statement.executeUpdate();
+
+            return rows > 0
+                    ? "Attendance updated successfully!"
+                    : "Attendance record not found.";
+
+        } catch (java.sql.SQLException e) {
+
+            if ("23505".equals(e.getSQLState())) {
+                return "An attendance record already exists "
+                        + "for this employee on this date.";
+            }
+
+            if ("23503".equals(e.getSQLState())) {
+                return "Employee ID does not exist.";
+            }
+
+            e.printStackTrace();
+
+            return "Attendance update failed: " + e.getMessage();
+
+        } catch (Exception e) {
+
+            e.printStackTrace();
+
+            return "Attendance update failed: " + e.getMessage();
+        }
+    }
+
+
+    // 4. DELETE ATTENDANCE
+    @Override
+    public String deleteAttendance(int attendanceId)
+            throws RemoteException {
+
+        if (attendanceId <= 0) {
+            return "Invalid attendance ID.";
+        }
+
+        String sql = "DELETE FROM attendance "
+                + "WHERE attendance_id = ?";
+
+        try (Connection connection = DBConnection.getConnection();
+             PreparedStatement statement =
+                     connection.prepareStatement(sql)) {
+
+            statement.setInt(1, attendanceId);
+
+            int rows = statement.executeUpdate();
+
+            return rows > 0
+                    ? "Attendance record deleted successfully!"
+                    : "Attendance record not found.";
+
+        } catch (Exception e) {
+
+            e.printStackTrace();
+
+            return "Attendance deletion failed: " + e.getMessage();
+        }
+    }
 }

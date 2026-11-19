@@ -18,6 +18,8 @@ CREATE TABLE users (
 
 
 
+
+
 -- For employee table
 CREATE TABLE employees (
     employee_id SERIAL PRIMARY KEY,
@@ -57,4 +59,29 @@ CREATE TABLE leave_applications (
         REFERENCES employees(employee_id),
     CHECK (end_date >= start_date),
     CHECK (status IN ('Pending', 'Approved', 'Rejected'))
+);
+
+CREATE TABLE attendance (
+    attendance_id SERIAL PRIMARY KEY,
+
+    employee_id INTEGER NOT NULL,
+
+    attendance_date DATE NOT NULL DEFAULT CURRENT_DATE,
+
+    check_in TIME,
+
+    check_out TIME,
+
+    status VARCHAR(20) NOT NULL
+        CHECK (status IN ('Present', 'Absent', 'Late', 'On Leave')),
+
+    remarks TEXT,
+
+    CONSTRAINT fk_attendance_employee
+        FOREIGN KEY (employee_id)
+        REFERENCES employees(employee_id)
+        ON DELETE CASCADE,
+
+    CONSTRAINT unique_employee_attendance
+        UNIQUE (employee_id, attendance_date)
 );

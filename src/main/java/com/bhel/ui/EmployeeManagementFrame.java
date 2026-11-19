@@ -8,6 +8,7 @@ import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.rmi.RemoteException;
+import java.time.LocalDate;
 import java.util.List;
 
 public class EmployeeManagementFrame extends JFrame {
@@ -31,6 +32,7 @@ public class EmployeeManagementFrame extends JFrame {
         setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
 
         setLayout(new BorderLayout());
+        KeyboardNavigation.installEscape(this, this::dispose);
         getContentPane().setBackground(LIGHT_BG);
 
         createHeader();
@@ -83,11 +85,11 @@ public class EmployeeManagementFrame extends JFrame {
         searchPanel.add(searchButton, BorderLayout.EAST);
 
         String[] columns = {
-                "Employee ID",
-                "First Name",
-                "Last Name",
-                "IC / Passport",
-                "Username"
+                "Employee ID", "User ID", "Created At", "First Name",
+                "Last Name", "IC / Passport", "Username", "Gender",
+                "Date of Birth", "Phone", "Email", "Address",
+                "Department", "Designation", "Joining Date",
+                "Employment Status"
         };
 
         tableModel = new DefaultTableModel(columns, 0) {
@@ -111,6 +113,7 @@ public class EmployeeManagementFrame extends JFrame {
 
         employeeTable.setSelectionMode(
                 ListSelectionModel.SINGLE_SELECTION);
+        employeeTable.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
 
         JScrollPane scrollPane =
                 new JScrollPane(employeeTable);
@@ -157,14 +160,7 @@ public class EmployeeManagementFrame extends JFrame {
             tableModel.setRowCount(0);
 
             for (Employee employee : employees) {
-
-                tableModel.addRow(new Object[]{
-                        employee.getEmployeeId(),
-                        employee.getFirstName(),
-                        employee.getLastName(),
-                        employee.getIcPassport(),
-                        employee.getUsername()
-                });
+                tableModel.addRow(employeeRow(employee));
             }
 
         } catch (RemoteException e) {
@@ -181,8 +177,11 @@ public class EmployeeManagementFrame extends JFrame {
     // SEARCH EMPLOYEES
     private void searchEmployees() {
 
-        String searchText =
-                searchField.getText().trim().toLowerCase();
+        String searchText = searchField.getText().trim().toLowerCase();
+        if (searchText.isEmpty()) {
+            loadEmployees();
+            return;
+        }
 
         tableModel.setRowCount(0);
 
@@ -192,31 +191,17 @@ public class EmployeeManagementFrame extends JFrame {
                     hrmService.getAllEmployees();
 
             for (Employee employee : employees) {
-
-                String firstName =
-                        employee.getFirstName().toLowerCase();
-
-                String lastName =
-                        employee.getLastName().toLowerCase();
-
-                String username =
-                        employee.getUsername().toLowerCase();
-
-                String icPassport =
-                        employee.getIcPassport().toLowerCase();
-
-                if (firstName.contains(searchText)
-                        || lastName.contains(searchText)
-                        || username.contains(searchText)
-                        || icPassport.contains(searchText)) {
-
-                    tableModel.addRow(new Object[]{
-                            employee.getEmployeeId(),
-                            employee.getFirstName(),
-                            employee.getLastName(),
-                            employee.getIcPassport(),
-                            employee.getUsername()
-                    });
+                Object[] values = employeeRow(employee);
+                boolean matches = false;
+                for (Object value : values) {
+                    if (value != null && value.toString().toLowerCase()
+                            .contains(searchText)) {
+                        matches = true;
+                        break;
+                    }
+                }
+                if (matches) {
+                    tableModel.addRow(values);
                 }
             }
 
@@ -245,94 +230,121 @@ public class EmployeeManagementFrame extends JFrame {
             return;
         }
 
-        int employeeId =
-                Integer.parseInt(
-                        tableModel.getValueAt(
-                                selectedRow, 0).toString());
+        int employeeId = Integer.parseInt(
+                tableModel.getValueAt(selectedRow, 0).toString());
 
-        String firstName =
-                tableModel.getValueAt(selectedRow, 1).toString();
-
-        String lastName =
-                tableModel.getValueAt(selectedRow, 2).toString();
-
-        String icPassport =
-                tableModel.getValueAt(selectedRow, 3).toString();
-
-        JTextField firstNameField =
-                new JTextField(firstName);
-
-        JTextField lastNameField =
-                new JTextField(lastName);
-
-        JTextField icPassportField =
-                new JTextField(icPassport);
-
-        JPanel panel = new JPanel(new GridLayout(0, 2, 10, 10));
-
-        panel.add(new JLabel("First Name:"));
-        panel.add(firstNameField);
-
-        panel.add(new JLabel("Last Name:"));
-        panel.add(lastNameField);
-
-        panel.add(new JLabel("IC / Passport:"));
-        panel.add(icPassportField);
-
-        int result = JOptionPane.showConfirmDialog(
-                this,
-                panel,
-                "Edit Employee",
-                JOptionPane.OK_CANCEL_OPTION,
-                JOptionPane.PLAIN_MESSAGE);
-
-        if (result == JOptionPane.OK_OPTION) {
-
-            String updatedFirstName =
-                    firstNameField.getText().trim();
-
-            String updatedLastName =
-                    lastNameField.getText().trim();
-
-            String updatedIcPassport =
-                    icPassportField.getText().trim();
-
-            if (updatedFirstName.isEmpty()
-                    || updatedLastName.isEmpty()
-                    || updatedIcPassport.isEmpty()) {
-
-                JOptionPane.showMessageDialog(
-                        this,
-                        "All fields are required.");
-
+        try {
+            Employee employee = hrmService.getEmployeeById(employeeId);
+            if (employee == null) {
+                JOptionPane.showMessageDialog(this,
+                        "Employee record was not found.",
+                        "Edit Employee", JOptionPane.WARNING_MESSAGE);
                 return;
             }
 
-            try {
+            JTextField firstNameField = new JTextField(employee.getFirstName());
+            JTextField lastNameField = new JTextField(employee.getLastName());
+            JTextField icPassportField = new JTextField(employee.getIcPassport());
+            JComboBox<String> genderField = new JComboBox<>(
+                    new String[]{"", "Female", "Male", "Other"});
+            genderField.setSelectedItem(employee.getGender() == null
+                    ? "" : employee.getGender());
+            JTextField dobField = new JTextField(dateText(employee.getDateOfBirth()));
+            JTextField phoneField = new JTextField(valueText(employee.getPhone()));
+            JTextField emailField = new JTextField(valueText(employee.getEmail()));
+            JTextField addressField = new JTextField(valueText(employee.getAddress()));
+            JTextField departmentField = new JTextField(valueText(employee.getDepartment()));
+            JTextField designationField = new JTextField(valueText(employee.getDesignation()));
+            JTextField joiningField = new JTextField(dateText(employee.getJoiningDate()));
+            JComboBox<String> statusField = new JComboBox<>(new String[]{
+                    "Active", "On Leave", "Resigned", "Terminated"});
+            statusField.setSelectedItem(employee.getEmploymentStatus() == null
+                    ? "Active" : employee.getEmploymentStatus());
 
-                String response =
-                        hrmService.updateEmployee(
-                                employeeId,
-                                updatedFirstName,
-                                updatedLastName,
-                                updatedIcPassport);
+            JPanel form = new JPanel(new GridLayout(0, 2, 10, 8));
+            addEditField(form, "First Name", firstNameField);
+            addEditField(form, "Last Name", lastNameField);
+            addEditField(form, "IC / Passport", icPassportField);
+            addEditField(form, "Gender", genderField);
+            addEditField(form, "Date of Birth (YYYY-MM-DD)", dobField);
+            addEditField(form, "Phone", phoneField);
+            addEditField(form, "Email", emailField);
+            addEditField(form, "Address", addressField);
+            addEditField(form, "Department", departmentField);
+            addEditField(form, "Designation", designationField);
+            addEditField(form, "Joining Date (YYYY-MM-DD)", joiningField);
+            addEditField(form, "Employment Status", statusField);
 
-                JOptionPane.showMessageDialog(
-                        this,
-                        response);
+            JScrollPane scrollForm = new JScrollPane(form);
+            scrollForm.setPreferredSize(new Dimension(520, 480));
 
-                if (response.contains("successfully")) {
-                    loadEmployees();
-                }
-
-            } catch (RemoteException e) {
-
-                JOptionPane.showMessageDialog(
-                        this,
-                        "Update failed: " + e.getMessage(),
-                        "Error",
-                        JOptionPane.ERROR_MESSAGE);
+            int result = JOptionPane.showConfirmDialog(
+                    this, scrollForm, "Edit Employee",
+                    JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+            if (result != JOptionPane.OK_OPTION) {
+                return;
             }
+
+            LocalDate dateOfBirth = parseOptionalDate(dobField.getText());
+            LocalDate joiningDate = parseOptionalDate(joiningField.getText());
+            String response = hrmService.updateEmployee(
+                    employeeId,
+                    firstNameField.getText().trim(),
+                    lastNameField.getText().trim(),
+                    icPassportField.getText().trim(),
+                    (String) genderField.getSelectedItem(),
+                    dateOfBirth,
+                    phoneField.getText().trim(),
+                    emailField.getText().trim(),
+                    addressField.getText().trim(),
+                    departmentField.getText().trim(),
+                    designationField.getText().trim(),
+                    joiningDate,
+                    (String) statusField.getSelectedItem());
+
+            JOptionPane.showMessageDialog(this, response);
+            if (response != null && response.contains("successfully")) {
+                loadEmployees();
+            }
+        } catch (java.time.format.DateTimeParseException e) {
+            JOptionPane.showMessageDialog(this,
+                    "Dates must use YYYY-MM-DD format.",
+                    "Invalid Date", JOptionPane.WARNING_MESSAGE);
+        } catch (RemoteException e) {
+            JOptionPane.showMessageDialog(this,
+                    "Update failed: " + e.getMessage(),
+                    "Error", JOptionPane.ERROR_MESSAGE);
         }
+    }
+
+    private Object[] employeeRow(Employee employee) {
+        return new Object[]{
+                employee.getEmployeeId(), employee.getUserId(),
+                employee.getCreatedAt(), employee.getFirstName(),
+                employee.getLastName(), employee.getIcPassport(),
+                employee.getUsername(), employee.getGender(),
+                employee.getDateOfBirth(), employee.getPhone(),
+                employee.getEmail(), employee.getAddress(),
+                employee.getDepartment(), employee.getDesignation(),
+                employee.getJoiningDate(), employee.getEmploymentStatus()
+        };
+    }
+
+    private void addEditField(JPanel form, String label, JComponent field) {
+        form.add(new JLabel(label + ":"));
+        form.add(field);
+    }
+
+    private LocalDate parseOptionalDate(String value) {
+        String trimmed = value == null ? "" : value.trim();
+        return trimmed.isEmpty() ? null : LocalDate.parse(trimmed);
+    }
+
+    private String dateText(LocalDate value) {
+        return value == null ? "" : value.toString();
+    }
+
+    private String valueText(String value) {
+        return value == null ? "" : value;
     }
 }

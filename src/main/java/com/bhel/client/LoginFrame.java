@@ -2,6 +2,7 @@
 package com.bhel.client;
 
 import com.bhel.model.Employee;
+import com.bhel.ui.KeyboardNavigation;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
@@ -113,6 +114,8 @@ public class LoginFrame extends JFrame {
 
         loginButton.addActionListener(e -> login());
         clearButton.addActionListener(e -> clearFields());
+        getRootPane().setDefaultButton(loginButton);
+        KeyboardNavigation.installEscape(this, this::dispose);
 
         rightPanel.add(loginTitle);
         rightPanel.add(Box.createVerticalStrut(8));
@@ -209,7 +212,7 @@ public class LoginFrame extends JFrame {
 
                 dispose();
 
-                new com.bhel.ui.AdminDashboard().setVisible(true);
+                new com.bhel.ui.AdminDashboard(username).setVisible(true);
 
             } else {
 

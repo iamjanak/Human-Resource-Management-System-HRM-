@@ -25,6 +25,7 @@ public class LeaveManagementFrame extends JFrame {
     private final HRMService hrmService;
     private final int employeeId;
     private final boolean adminMode;
+    private final String reviewerName;
 
     private JComboBox<String> leaveType;
     private DatePickerField startDatePicker;
@@ -42,7 +43,7 @@ public class LeaveManagementFrame extends JFrame {
     // ==========================================
 
     public LeaveManagementFrame(HRMService hrmService, int employeeId) {
-        this(hrmService, employeeId, false);
+        this(hrmService, employeeId, false, null);
     }
 
     // ==========================================
@@ -50,7 +51,13 @@ public class LeaveManagementFrame extends JFrame {
     // ==========================================
 
     public LeaveManagementFrame(HRMService hrmService) {
-        this(hrmService, 0, true);
+        this(hrmService, 0, true, "Admin");
+    }
+
+    public LeaveManagementFrame(HRMService hrmService, String reviewerName) {
+        this(hrmService, 0, true,
+                reviewerName == null || reviewerName.trim().isEmpty()
+                        ? "Admin" : reviewerName.trim());
     }
 
     // ==========================================
@@ -60,11 +67,13 @@ public class LeaveManagementFrame extends JFrame {
     private LeaveManagementFrame(
             HRMService hrmService,
             int employeeId,
-            boolean adminMode) {
+            boolean adminMode,
+            String reviewerName) {
 
         this.hrmService = hrmService;
         this.employeeId = employeeId;
         this.adminMode = adminMode;
+        this.reviewerName = reviewerName;
 
         setTitle("BHEL HRM - Leave Management");
         setSize(1150, 780);
@@ -72,6 +81,7 @@ public class LeaveManagementFrame extends JFrame {
         setLocationRelativeTo(null);
         setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
         setLayout(new BorderLayout());
+        KeyboardNavigation.installEscape(this, this::dispose);
 
         getContentPane().setBackground(LIGHT_BG);
 
@@ -332,6 +342,7 @@ public class LeaveManagementFrame extends JFrame {
                     LeaveManagementFrame.this);
 
             dialog.setLayout(new BorderLayout());
+            KeyboardNavigation.installEscape(dialog, dialog::dispose);
 
             JPanel calendarPanel = new JPanel(
                     new BorderLayout(5, 10));
@@ -490,14 +501,12 @@ public class LeaveManagementFrame extends JFrame {
 
     private void createLeaveTable() {
 
-        String[] columns = {
-                "Leave ID",
-                "Leave Type",
-                "Start Date",
-                "End Date",
-                "Reason",
-                "Status"
-        };
+        String[] columns = adminMode
+                ? new String[]{"Leave ID", "Employee ID", "Employee Name",
+                    "Leave Type", "Start Date", "End Date", "Reason",
+                    "Status", "Reviewed By"}
+                : new String[]{"Leave ID", "Leave Type", "Start Date",
+                    "End Date", "Reason", "Status", "Reviewed By"};
 
         tableModel = new DefaultTableModel(columns, 0) {
 
@@ -539,9 +548,9 @@ public class LeaveManagementFrame extends JFrame {
                 new Dimension(0, 42));
 
         // Column widths
-        int[] widths = {
-                75, 140, 120, 120, 300, 110
-        };
+        int[] widths = adminMode
+                ? new int[]{75, 90, 150, 140, 120, 120, 230, 100, 130}
+                : new int[]{75, 140, 120, 120, 270, 110, 140};
 
         for (int i = 0; i < widths.length; i++) {
 
@@ -551,7 +560,7 @@ public class LeaveManagementFrame extends JFrame {
         }
 
         leaveTable.getColumnModel()
-                .getColumn(4)
+                .getColumn(adminMode ? 6 : 4)
                 .setCellRenderer(new ReasonCellRenderer());
 
         JScrollPane scrollPane = new JScrollPane(
@@ -584,11 +593,84 @@ public class LeaveManagementFrame extends JFrame {
 
         historyTitle.setForeground(NAVY);
 
-        tablePanel.add(
-                historyTitle, BorderLayout.NORTH);
+        JPanel tableHeader = new JPanel(new BorderLayout(0, 8));
+        tableHeader.setBackground(LIGHT_BG);
+        tableHeader.add(historyTitle, BorderLayout.NORTH);
+
+        if (adminMode) {
+            tableHeader.add(createReviewControls(), BorderLayout.SOUTH);
+        }
+
+        tablePanel.add(tableHeader, BorderLayout.NORTH);
 
         tablePanel.add(
                 scrollPane, BorderLayout.CENTER);
+    }
+
+    private JPanel createReviewControls() {
+        JPanel controls = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
+        controls.setBackground(LIGHT_BG);
+
+        JButton refreshButton = new JButton("Refresh");
+        JButton rejectButton = new JButton("Reject Selected");
+        JButton approveButton = new JButton("Approve Selected");
+
+        refreshButton.addActionListener(e -> loadLeaveApplications());
+        rejectButton.addActionListener(e -> reviewSelectedLeave("Rejected"));
+        approveButton.addActionListener(e -> reviewSelectedLeave("Approved"));
+
+        controls.add(refreshButton);
+        controls.add(rejectButton);
+        controls.add(approveButton);
+        return controls;
+    }
+
+    private void reviewSelectedLeave(String decision) {
+        int selectedRow = leaveTable.getSelectedRow();
+        if (selectedRow < 0) {
+            JOptionPane.showMessageDialog(this,
+                    "Select a leave request first.", "No Request Selected",
+                    JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        int modelRow = leaveTable.convertRowIndexToModel(selectedRow);
+        int leaveId = Integer.parseInt(
+                tableModel.getValueAt(modelRow, 0).toString());
+        int statusColumn = adminMode ? 7 : 5;
+        String status = String.valueOf(
+                tableModel.getValueAt(modelRow, statusColumn));
+        if (!"Pending".equalsIgnoreCase(status)) {
+            JOptionPane.showMessageDialog(this,
+                    "Only pending requests can be reviewed.",
+                    "Request Already Reviewed", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        int confirmation = JOptionPane.showConfirmDialog(this,
+                decision + " leave request " + leaveId + "?",
+                "Confirm Leave Decision", JOptionPane.YES_NO_OPTION);
+        if (confirmation != JOptionPane.YES_OPTION) {
+            return;
+        }
+
+        try {
+            String response = hrmService.reviewLeave(
+                    leaveId, decision, reviewerName);
+            JOptionPane.showMessageDialog(this, response,
+                    "Leave Review", response != null
+                            && response.toLowerCase(Locale.ROOT).contains("successfully")
+                            ? JOptionPane.INFORMATION_MESSAGE
+                            : JOptionPane.ERROR_MESSAGE);
+            if (response != null
+                    && response.toLowerCase(Locale.ROOT).contains("successfully")) {
+                loadLeaveApplications();
+            }
+        } catch (RemoteException e) {
+            JOptionPane.showMessageDialog(this,
+                    "Unable to update leave request: " + e.getMessage(),
+                    "Server Error", JOptionPane.ERROR_MESSAGE);
+        }
     }
 
     // ==========================================
@@ -751,11 +833,14 @@ public class LeaveManagementFrame extends JFrame {
 
                     tableModel.addRow(new Object[]{
                             leave.getLeaveId(),
+                            leave.getEmployeeId(),
+                            leave.getEmployeeName(),
                             leave.getLeaveType(),
                             leave.getStartDate(),
                             leave.getEndDate(),
                             leave.getReason(),
-                            leave.getStatus()
+                            leave.getStatus(),
+                            leave.getReviewedBy()
                     });
                 }
 
@@ -782,7 +867,8 @@ public class LeaveManagementFrame extends JFrame {
                             leave.getStartDate(),
                             leave.getEndDate(),
                             leave.getReason(),
-                            leave.getStatus()
+                            leave.getStatus(),
+                            leave.getReviewedBy()
                     });
                 }
             }
@@ -808,10 +894,11 @@ public class LeaveManagementFrame extends JFrame {
 
         for (int row = 0; row < leaveTable.getRowCount(); row++) {
 
+            int reasonColumn = adminMode ? 6 : 4;
             Component component = leaveTable.prepareRenderer(
-                    leaveTable.getCellRenderer(row, 4),
+                    leaveTable.getCellRenderer(row, reasonColumn),
                     row,
-                    4);
+                    reasonColumn);
 
             int height = component.getPreferredSize().height;
 
