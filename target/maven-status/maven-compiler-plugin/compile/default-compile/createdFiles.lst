@@ -1,4 +1,5 @@
 com\bhel\model\LeaveApplication.class
+com\bhel\ui\EmployeeDashboard$DashboardContentPanel.class
 com\bhel\security\CreateAdmin.class
 com\bhel\ui\EmployeeProfileFrame$1.class
 com\bhel\ui\SystemSettingsFrame.class
@@ -13,10 +14,13 @@ com\bhel\remote\HRMService.class
 com\bhel\ui\AdminDashboard.class
 com\bhel\client\HRMClient.class
 com\bhel\model\Attendance.class
+com\bhel\ui\PayslipFrame$1.class
 com\bhel\server\HRMServer$AttendanceSession.class
+com\bhel\model\Payslip.class
 com\bhel\ui\AdminDashboard$1.class
 com\bhel\ui\EmployeeReportsFrame$1.class
 com\bhel\ui\AttendanceManagementFrame.class
+com\bhel\ui\PayslipFrame.class
 com\bhel\ui\EmployeeDashboard$AttendanceTimeInput.class
 com\bhel\ui\LeaveManagementFrame$ReasonCellRenderer.class
 com\bhel\database\DBConnection.class
@@ -31,6 +35,7 @@ com\bhel\model\Employee.class
 com\bhel\ui\LeaveManagementFrame$DatePickerField.class
 com\bhel\ui\EmployeeReportsFrame$MonthChoice.class
 com\bhel\ui\EmployeeReportsFrame.class
+com\bhel\ui\PayslipFrame$2.class
 com\bhel\ui\KeyboardNavigation$1.class
 com\bhel\ui\RegisterEmployeeFrame.class
 com\bhel\ui\EmployeeDashboard$1.class

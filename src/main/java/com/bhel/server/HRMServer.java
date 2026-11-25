@@ -27,10 +27,300 @@ import java.sql.Timestamp;
 import java.util.concurrent.CountDownLatch;
 import com.bhel.model.Department;
 import com.bhel.model.Attendance;
+import com.bhel.model.Payslip;
+import com.bhel.model.TimeRequest;
+import java.math.BigDecimal;
+import java.time.YearMonth;
 import java.sql.Time;
 import java.time.LocalTime;
 
 public class HRMServer extends UnicastRemoteObject implements HRMService {
+
+    private void ensureTimeRequestTable(Connection connection) throws java.sql.SQLException {
+        try (java.sql.Statement statement = connection.createStatement()) {
+            statement.executeUpdate("CREATE TABLE IF NOT EXISTS time_requests ("
+                    + "request_id BIGSERIAL PRIMARY KEY, "
+                    + "employee_id INTEGER NOT NULL REFERENCES employees(employee_id) ON DELETE CASCADE, "
+                    + "request_type VARCHAR(100) NOT NULL, request_date DATE NOT NULL, "
+                    + "start_time TIME NOT NULL, end_time TIME NOT NULL, reason TEXT NOT NULL, "
+                    + "status VARCHAR(20) NOT NULL DEFAULT 'Pending' "
+                    + "CHECK (status IN ('Pending', 'Approved', 'Rejected')), "
+                    + "reviewed_by VARCHAR(100), reviewed_on DATE, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, "
+                    + "CHECK (end_time > start_time))");
+        }
+    }
+
+    @Override
+    public String submitTimeRequest(String attendanceSessionToken, String requestType,
+                                   LocalDate requestDate, LocalTime startTime,
+                                   LocalTime endTime, String reason)
+            throws RemoteException {
+        int employeeId = requireAttendanceSession(attendanceSessionToken);
+        List<String> supportedTypes = List.of(
+                "Short Time Away / Late Arrival / Early Departure",
+                "Attendance Time Correction", "Overtime");
+        if (requestType == null || !supportedTypes.contains(requestType.trim())
+                || requestDate == null || startTime == null || endTime == null
+                || !endTime.isAfter(startTime) || reason == null || reason.isBlank()) {
+            return "Choose a request type and date, enter a valid time range, and provide a reason.";
+        }
+        String sql = "INSERT INTO time_requests(employee_id, request_type, request_date, "
+                + "start_time, end_time, reason) VALUES (?, ?, ?, ?, ?, ?)";
+        try (Connection connection = DBConnection.getConnection()) {
+            ensureTimeRequestTable(connection);
+            try (PreparedStatement statement = connection.prepareStatement(sql)) {
+                statement.setInt(1, employeeId);
+                statement.setString(2, requestType.trim());
+                statement.setDate(3, Date.valueOf(requestDate));
+                statement.setTime(4, Time.valueOf(startTime));
+                statement.setTime(5, Time.valueOf(endTime));
+                statement.setString(6, reason.trim());
+                statement.executeUpdate();
+                return "Time request submitted successfully. It is pending HR review.";
+            }
+        } catch (Exception e) {
+            throw new RemoteException("Unable to submit time request: " + e.getMessage(), e);
+        }
+    }
+
+    @Override
+    public List<TimeRequest> getEmployeeTimeRequests(String attendanceSessionToken)
+            throws RemoteException {
+        return queryTimeRequests("WHERE t.employee_id=?",
+                requireAttendanceSession(attendanceSessionToken));
+    }
+
+    @Override
+    public List<TimeRequest> getAllTimeRequests() throws RemoteException {
+        return queryTimeRequests("", null);
+    }
+
+    private List<TimeRequest> queryTimeRequests(String filter, Integer employeeId)
+            throws RemoteException {
+        List<TimeRequest> requests = new ArrayList<>();
+        String sql = "SELECT t.request_id, t.employee_id, e.first_name, e.last_name, "
+                + "t.request_type, t.request_date, t.start_time, t.end_time, t.reason, "
+                + "t.status, t.reviewed_by, t.reviewed_on "
+                + "FROM time_requests t JOIN employees e USING(employee_id) " + filter
+                + " ORDER BY t.created_at DESC, t.request_id DESC";
+        try (Connection connection = DBConnection.getConnection()) {
+            ensureTimeRequestTable(connection);
+            try (PreparedStatement statement = connection.prepareStatement(sql)) {
+                if (employeeId != null) statement.setInt(1, employeeId);
+                try (ResultSet result = statement.executeQuery()) {
+                    while (result.next()) {
+                        Date reviewedOn = result.getDate("reviewed_on");
+                        requests.add(new TimeRequest(result.getInt("request_id"),
+                                result.getInt("employee_id"),
+                                (result.getString("first_name") + " "
+                                        + result.getString("last_name")).trim(),
+                                result.getString("request_type"),
+                                result.getDate("request_date").toLocalDate(),
+                                result.getTime("start_time").toLocalTime(),
+                                result.getTime("end_time").toLocalTime(),
+                                result.getString("reason"), result.getString("status"),
+                                result.getString("reviewed_by"),
+                                reviewedOn == null ? null : reviewedOn.toLocalDate()));
+                    }
+                }
+            }
+            return requests;
+        } catch (Exception e) {
+            throw new RemoteException("Unable to load time requests: " + e.getMessage(), e);
+        }
+    }
+
+    @Override
+    public String reviewTimeRequest(int requestId, String status, String reviewedBy)
+            throws RemoteException {
+        if (requestId <= 0 || status == null
+                || !("Approved".equalsIgnoreCase(status)
+                || "Rejected".equalsIgnoreCase(status))
+                || reviewedBy == null || reviewedBy.isBlank()) {
+            return "A valid request, decision, and reviewer are required.";
+        }
+        String sql = "UPDATE time_requests SET status=?, reviewed_by=?, reviewed_on=CURRENT_DATE "
+                + "WHERE request_id=? AND status='Pending'";
+        try (Connection connection = DBConnection.getConnection()) {
+            ensureTimeRequestTable(connection);
+            try (PreparedStatement statement = connection.prepareStatement(sql)) {
+                statement.setString(1, status.equalsIgnoreCase("Approved") ? "Approved" : "Rejected");
+                statement.setString(2, reviewedBy.trim());
+                statement.setInt(3, requestId);
+                return statement.executeUpdate() == 1
+                        ? "Time request " + status.toLowerCase(java.util.Locale.ROOT) + " successfully."
+                        : "Request was not found or has already been reviewed.";
+            }
+        } catch (Exception e) {
+            throw new RemoteException("Unable to review time request: " + e.getMessage(), e);
+        }
+    }
+
+    private void ensurePayrollTables(Connection connection) throws java.sql.SQLException {
+        try (java.sql.Statement statement = connection.createStatement()) {
+            statement.executeUpdate("CREATE TABLE IF NOT EXISTS employee_payroll ("
+                    + "employee_id INTEGER PRIMARY KEY REFERENCES employees(employee_id) ON DELETE CASCADE, "
+                    + "monthly_salary NUMERIC(14,2) NOT NULL CHECK (monthly_salary >= 0), "
+                    + "updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP)");
+            statement.executeUpdate("CREATE TABLE IF NOT EXISTS payslips ("
+                    + "payslip_id BIGSERIAL PRIMARY KEY, "
+                    + "employee_id INTEGER NOT NULL REFERENCES employees(employee_id) ON DELETE CASCADE, "
+                    + "pay_period DATE NOT NULL, gross_pay NUMERIC(14,2) NOT NULL, "
+                    + "deductions NUMERIC(14,2) NOT NULL DEFAULT 0, "
+                    + "net_pay NUMERIC(14,2) NOT NULL, generated_on DATE NOT NULL DEFAULT CURRENT_DATE, "
+                    + "UNIQUE(employee_id, pay_period))");
+        }
+    }
+
+    @Override
+    public String setMonthlySalary(int employeeId, BigDecimal monthlySalary)
+            throws RemoteException {
+        if (employeeId <= 0 || monthlySalary == null || monthlySalary.signum() < 0
+                || monthlySalary.scale() > 2 || monthlySalary.precision() > 14) {
+            return "Enter a valid monthly salary (up to 2 decimal places).";
+        }
+        String sql = "INSERT INTO employee_payroll(employee_id, monthly_salary) VALUES (?, ?) "
+                + "ON CONFLICT(employee_id) DO UPDATE SET monthly_salary = EXCLUDED.monthly_salary, "
+                + "updated_at = CURRENT_TIMESTAMP";
+        try (Connection connection = DBConnection.getConnection()) {
+            ensurePayrollTables(connection);
+            try (PreparedStatement statement = connection.prepareStatement(sql)) {
+                statement.setInt(1, employeeId);
+                statement.setBigDecimal(2, monthlySalary);
+                return statement.executeUpdate() == 1 ? "Monthly salary saved." : "Salary was not saved.";
+            }
+        } catch (Exception e) {
+            throw new RemoteException("Unable to save monthly salary: " + e.getMessage(), e);
+        }
+    }
+
+    @Override
+    public BigDecimal getMonthlySalary(int employeeId) throws RemoteException {
+        try (Connection connection = DBConnection.getConnection()) {
+            ensurePayrollTables(connection);
+            try (PreparedStatement statement = connection.prepareStatement(
+                    "SELECT monthly_salary FROM employee_payroll WHERE employee_id = ?")) {
+                statement.setInt(1, employeeId);
+                try (ResultSet result = statement.executeQuery()) {
+                    return result.next() ? result.getBigDecimal(1) : null;
+                }
+            }
+        } catch (Exception e) {
+            throw new RemoteException("Unable to load monthly salary: " + e.getMessage(), e);
+        }
+    }
+
+    @Override
+    public Payslip generatePayslip(int employeeId, YearMonth payPeriod)
+            throws RemoteException {
+        if (employeeId <= 0 || payPeriod == null) throw new RemoteException("Employee and pay period are required.");
+        String sql = "INSERT INTO payslips(employee_id, pay_period, gross_pay, deductions, net_pay) "
+                + "SELECT e.employee_id, ?, p.monthly_salary, 0, p.monthly_salary "
+                + "FROM employees e JOIN employee_payroll p ON p.employee_id=e.employee_id WHERE e.employee_id=? "
+                + "ON CONFLICT(employee_id, pay_period) DO NOTHING";
+        try (Connection connection = DBConnection.getConnection()) {
+            ensurePayrollTables(connection);
+            try (PreparedStatement statement = connection.prepareStatement(sql)) {
+                statement.setDate(1, Date.valueOf(payPeriod.atDay(1)));
+                statement.setInt(2, employeeId);
+                if (statement.executeUpdate() == 0) throw new RemoteException("Set a monthly salary for this employee before generating a payslip.");
+            }
+            return queryPayslip(connection, employeeId, payPeriod);
+        } catch (RemoteException e) { throw e;
+        } catch (Exception e) { throw new RemoteException("Unable to generate payslip: " + e.getMessage(), e); }
+    }
+
+    @Override
+    public String updatePayslip(int employeeId, YearMonth payPeriod,
+                                BigDecimal grossPay, BigDecimal deductions)
+            throws RemoteException {
+        if (employeeId <= 0 || payPeriod == null || grossPay == null || deductions == null
+                || grossPay.signum() < 0 || deductions.signum() < 0
+                || deductions.compareTo(grossPay) > 0
+                || grossPay.scale() > 2 || deductions.scale() > 2
+                || grossPay.precision() > 14 || deductions.precision() > 14) {
+            return "Enter valid amounts; deductions cannot exceed gross pay.";
+        }
+        String sql = "UPDATE payslips SET gross_pay=?, deductions=?, net_pay=?, generated_on=CURRENT_DATE "
+                + "WHERE employee_id=? AND pay_period=?";
+        try (Connection connection = DBConnection.getConnection()) {
+            ensurePayrollTables(connection);
+            try (PreparedStatement statement = connection.prepareStatement(sql)) {
+                statement.setBigDecimal(1, grossPay);
+                statement.setBigDecimal(2, deductions);
+                statement.setBigDecimal(3, grossPay.subtract(deductions));
+                statement.setInt(4, employeeId);
+                statement.setDate(5, Date.valueOf(payPeriod.atDay(1)));
+                return statement.executeUpdate() == 1
+                        ? "Payslip updated. Net pay has been recalculated."
+                        : "No payslip exists for this employee and pay period. Generate it first.";
+            }
+        } catch (Exception e) {
+            throw new RemoteException("Unable to update payslip: " + e.getMessage(), e);
+        }
+    }
+
+    private Payslip queryPayslip(Connection connection, int employeeId, YearMonth period)
+            throws java.sql.SQLException {
+        String sql = "SELECT p.employee_id, e.first_name, e.last_name, e.department, e.designation, "
+                + "e.ic_passport, e.gender, e.date_of_birth, e.phone, e.email, e.address, e.joining_date, e.employment_status, "
+                + "p.pay_period, p.gross_pay, p.deductions, p.net_pay, p.generated_on "
+                + "FROM payslips p JOIN employees e USING(employee_id) WHERE p.employee_id=? AND p.pay_period=?";
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setInt(1, employeeId);
+            statement.setDate(2, Date.valueOf(period.atDay(1)));
+            try (ResultSet result = statement.executeQuery()) {
+                if (!result.next()) return null;
+                return mapPayslip(result);
+            }
+        }
+    }
+
+    private Payslip mapPayslip(ResultSet result) throws java.sql.SQLException {
+        Date joiningDate = result.getDate("joining_date");
+        return new Payslip(result.getInt("employee_id"),
+                (result.getString("first_name") + " " + result.getString("last_name")).trim(),
+                result.getString("department"), result.getString("designation"),
+                result.getString("ic_passport"), result.getString("gender"),
+                result.getDate("date_of_birth") == null ? null : result.getDate("date_of_birth").toLocalDate(),
+                result.getString("phone"),
+                result.getString("email"), result.getString("address"),
+                joiningDate == null ? null : joiningDate.toLocalDate(),
+                result.getString("employment_status"),
+                YearMonth.from(result.getDate("pay_period").toLocalDate()),
+                result.getBigDecimal("gross_pay"), result.getBigDecimal("deductions"),
+                result.getBigDecimal("net_pay"), result.getDate("generated_on").toLocalDate());
+    }
+
+    @Override
+    public List<Payslip> getEmployeePayslips(String attendanceSessionToken) throws RemoteException {
+        int employeeId = requireAttendanceSession(attendanceSessionToken);
+        return queryPayslips("WHERE p.employee_id=?", employeeId);
+    }
+
+    @Override
+    public List<Payslip> getAllPayslips() throws RemoteException {
+        return queryPayslips("", null);
+    }
+
+    private List<Payslip> queryPayslips(String filter, Integer employeeId) throws RemoteException {
+        List<Payslip> slips = new ArrayList<>();
+        String sql = "SELECT p.employee_id, e.first_name, e.last_name, e.department, e.designation, "
+                + "e.ic_passport, e.gender, e.date_of_birth, e.phone, e.email, e.address, e.joining_date, e.employment_status, "
+                + "p.pay_period, p.gross_pay, p.deductions, p.net_pay, p.generated_on "
+                + "FROM payslips p JOIN employees e USING(employee_id) " + filter
+                + " ORDER BY p.pay_period DESC, e.last_name, e.first_name";
+        try (Connection connection = DBConnection.getConnection()) {
+            ensurePayrollTables(connection);
+            try (PreparedStatement statement = connection.prepareStatement(sql)) {
+                if (employeeId != null) statement.setInt(1, employeeId);
+                try (ResultSet result = statement.executeQuery()) {
+                    while (result.next()) slips.add(mapPayslip(result));
+                }
+            }
+            return slips;
+        } catch (Exception e) { throw new RemoteException("Unable to load payslips: " + e.getMessage(), e); }
+    }
 
     private final Map<String, AttendanceSession> attendanceSessions =
             new ConcurrentHashMap<>();

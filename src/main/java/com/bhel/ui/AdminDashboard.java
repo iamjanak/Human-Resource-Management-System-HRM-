@@ -45,8 +45,6 @@ public class AdminDashboard extends JFrame {
         setLocationRelativeTo(null);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLayout(new BorderLayout());
-        KeyboardNavigation.installEscape(this, this::logout);
-
         connectToServer();
 
         createHeader();
@@ -181,6 +179,12 @@ public class AdminDashboard extends JFrame {
         addMenuItem(menuPanel, "Attendance Management",
                 this::openAttendanceManagement);
 
+        addMenuItem(menuPanel, "Payroll & Payslips",
+                this::openPayroll);
+
+        addMenuItem(menuPanel, "Time Request Management",
+                this::openTimeRequestManagement);
+
         // SYSTEM SETTINGS
         addMenuItem(menuPanel, "System Settings",
                 this::openSystemSettings);
@@ -195,7 +199,13 @@ public class AdminDashboard extends JFrame {
 
         logoutPanel.add(logoutButton, BorderLayout.CENTER);
 
-        sidebar.add(menuPanel, BorderLayout.NORTH);
+        JScrollPane menuScroll = new JScrollPane(menuPanel,
+                JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
+                JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+        menuScroll.setBorder(null);
+        menuScroll.getViewport().setBackground(NAVY);
+        menuScroll.getVerticalScrollBar().setUnitIncrement(16);
+        sidebar.add(menuScroll, BorderLayout.CENTER);
         sidebar.add(logoutPanel, BorderLayout.SOUTH);
 
         return sidebar;
@@ -327,7 +337,7 @@ public class AdminDashboard extends JFrame {
 
         statsPanel.add(createStatCard(
                 "HR Modules",
-                new JLabel("8")
+                new JLabel("10")
         ));
 
         dashboardBody.add(statsPanel);
@@ -343,7 +353,7 @@ public class AdminDashboard extends JFrame {
         dashboardBody.add(Box.createVerticalStrut(18));
 
         JPanel actionsPanel = new JPanel(
-                new GridLayout(2, 3, 15, 15)
+                new GridLayout(0, 4, 15, 15)
         );
 
         actionsPanel.setBackground(LIGHT_BG);
@@ -382,6 +392,24 @@ public class AdminDashboard extends JFrame {
                 "Attendance",
                 "Manage employee attendance",
                 this::openAttendanceManagement
+        ));
+
+        actionsPanel.add(createActionCard(
+                "Payroll & Payslips",
+                "Set salaries and issue monthly payslips",
+                this::openPayroll
+        ));
+
+        actionsPanel.add(createActionCard(
+                "System Settings",
+                "Manage HR system preferences",
+                this::openSystemSettings
+        ));
+
+        actionsPanel.add(createActionCard(
+                "Time Requests",
+                "Review employee schedule and attendance requests",
+                this::openTimeRequestManagement
         ));
 
         dashboardBody.add(actionsPanel);
@@ -661,9 +689,19 @@ public class AdminDashboard extends JFrame {
         }
 
         SystemSettingsFrame frame =
-                new SystemSettingsFrame(hrmService, username);
+                new SystemSettingsFrame(hrmService, username, this::logout);
 
         frame.setVisible(true);
+    }
+
+    private void openPayroll() {
+        if (!checkConnection()) return;
+        new PayslipFrame(hrmService, null, true).setVisible(true);
+    }
+
+    private void openTimeRequestManagement() {
+        if (!checkConnection()) return;
+        new TimeRequestFrame(hrmService, username, true).setVisible(true);
     }
 
     // ================= CONNECTION CHECK =================
@@ -699,7 +737,7 @@ public class AdminDashboard extends JFrame {
 
     // ================= LOGOUT =================
 
-    private void logout() {
+    private boolean logout() {
 
         int result = JOptionPane.showConfirmDialog(
                 this,
@@ -713,6 +751,8 @@ public class AdminDashboard extends JFrame {
             dispose();
 
             new LoginFrame().setVisible(true);
+            return true;
         }
+        return false;
     }
 }

@@ -11,6 +11,10 @@ import com.bhel.model.FamilyMember;
 import com.bhel.model.LeaveApplication;
 import com.bhel.model.Department;
 import com.bhel.model.Attendance;
+import com.bhel.model.Payslip;
+import com.bhel.model.TimeRequest;
+import java.math.BigDecimal;
+import java.time.YearMonth;
 
 public interface HRMService extends Remote {
 
@@ -156,6 +160,36 @@ public interface HRMService extends Remote {
             throws RemoteException;
 
     String deleteAttendance(int attendanceId)
+            throws RemoteException;
+
+    String setMonthlySalary(int employeeId, BigDecimal monthlySalary)
+            throws RemoteException;
+
+    BigDecimal getMonthlySalary(int employeeId) throws RemoteException;
+
+    Payslip generatePayslip(int employeeId, YearMonth payPeriod)
+            throws RemoteException;
+
+    String updatePayslip(int employeeId, YearMonth payPeriod,
+                         BigDecimal grossPay, BigDecimal deductions)
+            throws RemoteException;
+
+    List<Payslip> getEmployeePayslips(String attendanceSessionToken) throws RemoteException;
+
+    List<Payslip> getAllPayslips() throws RemoteException;
+
+    String submitTimeRequest(String attendanceSessionToken, String requestType,
+                             LocalDate requestDate,
+                             java.time.LocalTime startTime,
+                             java.time.LocalTime endTime, String reason)
+            throws RemoteException;
+
+    List<TimeRequest> getEmployeeTimeRequests(String attendanceSessionToken)
+            throws RemoteException;
+
+    List<TimeRequest> getAllTimeRequests() throws RemoteException;
+
+    String reviewTimeRequest(int requestId, String status, String reviewedBy)
             throws RemoteException;
 
 }

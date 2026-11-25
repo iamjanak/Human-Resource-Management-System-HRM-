@@ -53,8 +53,8 @@ public class EmployeeReportsFrame extends JFrame {
     public EmployeeReportsFrame(HRMService hrmService) {
         this.hrmService = hrmService;
         setTitle("BHEL HRM - Reports");
-        setSize(1200, 760);
-        setMinimumSize(new Dimension(980, 620));
+        setSize(1120, 700);
+        setMinimumSize(new Dimension(860, 560));
         setLocationRelativeTo(null);
         setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
         setLayout(new BorderLayout());
@@ -67,13 +67,24 @@ public class EmployeeReportsFrame extends JFrame {
         JPanel topBar = new JPanel(new BorderLayout());
         topBar.setBackground(NAVY);
         topBar.setBorder(new EmptyBorder(15, 20, 15, 20));
-        JLabel appTitle = new JLabel("BHEL HRM   ›   Reports");
+        JLabel appTitle = new JLabel("BHEL HRM  /  Employee Reports");
         appTitle.setFont(new Font("Segoe UI", Font.BOLD, 19));
         appTitle.setForeground(Color.WHITE);
         JButton refreshButton = new JButton("Refresh Employees");
         styleButton(refreshButton, false);
         refreshButton.addActionListener(e -> loadEmployees());
-        topBar.add(appTitle, BorderLayout.WEST);
+        JPanel brand = new JPanel();
+        brand.setOpaque(false);
+        brand.setLayout(new BoxLayout(brand, BoxLayout.Y_AXIS));
+        appTitle.setFont(new Font("Segoe UI", Font.BOLD, 20));
+        appTitle.setForeground(Color.WHITE);
+        JLabel appSubtitle = new JLabel("Review, export, and print employee records");
+        appSubtitle.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        appSubtitle.setForeground(new Color(205, 217, 233));
+        brand.add(appTitle);
+        brand.add(Box.createVerticalStrut(4));
+        brand.add(appSubtitle);
+        topBar.add(brand, BorderLayout.WEST);
         topBar.add(refreshButton, BorderLayout.EAST);
         add(topBar, BorderLayout.NORTH);
 
@@ -108,7 +119,7 @@ public class EmployeeReportsFrame extends JFrame {
         JScrollPane navigation = new JScrollPane(reportTree);
         navigation.setBorder(BorderFactory.createMatteBorder(0, 0, 0, 1, NAVY));
         navigation.getViewport().setBackground(NAVY);
-        navigation.setPreferredSize(new Dimension(285, 0));
+        navigation.setPreferredSize(new Dimension(245, 0));
 
         JPanel right = new JPanel(new BorderLayout(0, 12));
         right.setBackground(LIGHT_BG);
@@ -136,7 +147,7 @@ public class EmployeeReportsFrame extends JFrame {
 
         JSplitPane split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, navigation, right);
         split.setResizeWeight(0.25);
-        split.setDividerLocation(285);
+        split.setDividerLocation(245);
         split.setBorder(null);
         add(split, BorderLayout.CENTER);
         showWelcome();
@@ -153,7 +164,9 @@ public class EmployeeReportsFrame extends JFrame {
                 for (Employee employee : employees) employeeBox.addItem(employee);
                 if (current != null) selectEmployeeById(current.getEmployeeId());
             }
-            statusLabel.setText(employees.size() + " employees available");
+            statusLabel.setText(employees.isEmpty()
+                    ? "No employee records are available."
+                    : employees.size() + " employees available");
         } catch (Exception e) {
             statusLabel.setText("Could not load employee records: " + e.getMessage());
         }
@@ -175,6 +188,7 @@ public class EmployeeReportsFrame extends JFrame {
         reportDescription.setText(descriptionFor(report));
         reportBody.removeAll();
         filtersPanel.removeAll();
+        filtersPanel.setLayout(new FlowLayout(FlowLayout.LEFT, 10, 7));
 
         employeeBox = new JComboBox<>();
         employeeBox.setFont(new Font("Segoe UI", Font.PLAIN, 13));
@@ -227,6 +241,12 @@ public class EmployeeReportsFrame extends JFrame {
         filtersPanel.setBackground(Color.WHITE);
         filtersPanel.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createLineBorder(BORDER), new EmptyBorder(9, 10, 9, 10)));
+        for (Component component : filtersPanel.getComponents()) {
+            if (component instanceof JLabel label) {
+                label.setFont(new Font("Segoe UI", Font.BOLD, 12));
+                label.setForeground(NAVY);
+            }
+        }
         reportBody.add(filtersPanel, BorderLayout.NORTH);
         showEmptyTable();
         reportBody.revalidate();
@@ -245,6 +265,9 @@ public class EmployeeReportsFrame extends JFrame {
 
     private void showWelcome() {
         reportBody.removeAll();
+        statusLabel.setText(employees.isEmpty()
+                ? "No employee records are available."
+                : employees.size() + " employees available");
         JLabel welcome = new JLabel("Select a report from the list on the left.", SwingConstants.CENTER);
         welcome.setFont(new Font("Segoe UI", Font.BOLD, 18));
         welcome.setForeground(NAVY);
@@ -397,12 +420,16 @@ public class EmployeeReportsFrame extends JFrame {
         }
         rows.add(new Object[]{"Total Approved Leave Days", approvedTotal});
 
-        int annualUsed = approvedDays(leaves, employee.getEmployeeId(), year, "Annual Leave");
-        int sickUsed = approvedDays(leaves, employee.getEmployeeId(), year, "Sick Leave");
-        int emergencyUsed = approvedDays(leaves, employee.getEmployeeId(), year, "Emergency Leave");
-        rows.add(new Object[]{"Remaining Annual Leave Balance", 1 - annualUsed + " days"});
-        rows.add(new Object[]{"Remaining Sick Leave Balance", 1 - sickUsed + " days"});
-        rows.add(new Object[]{"Remaining Emergency Leave Balance", 1 - emergencyUsed + " days"});
+        int annualUsed = approvedDaysThroughAccrual(leaves, employee.getEmployeeId(), year, "Annual Leave");
+        int sickUsed = approvedDaysThroughAccrual(leaves, employee.getEmployeeId(), year, "Sick Leave");
+        int emergencyUsed = approvedDaysThroughAccrual(leaves, employee.getEmployeeId(), year, "Emergency Leave");
+        int accrued = accruedDaysForYear(year);
+        rows.add(new Object[]{"Annual Leave Accrued / Remaining", accrued + " / "
+                + (accrued - annualUsed) + " days"});
+        rows.add(new Object[]{"Sick Leave Accrued / Remaining", accrued + " / "
+                + (accrued - sickUsed) + " days"});
+        rows.add(new Object[]{"Emergency Leave Accrued / Remaining", accrued + " / "
+                + (accrued - emergencyUsed) + " days"});
 
         setReport(YEARLY + " - " + employeeName(employee) + " - " + year,
                 new String[]{"Information", "Value"}, rows);
@@ -425,33 +452,77 @@ public class EmployeeReportsFrame extends JFrame {
         for (Object[] row : rows) reportModel.addRow(row);
         reportTable = new JTable(reportModel);
         reportTable.setFont(new Font("Segoe UI", Font.PLAIN, 12));
-        reportTable.setRowHeight(27);
+        reportTable.setRowHeight(30);
         reportTable.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
+        reportTable.setFillsViewportHeight(true);
+        reportTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         reportTable.setGridColor(BORDER);
         reportTable.setSelectionBackground(new Color(220, 232, 248));
         reportTable.setSelectionForeground(Color.BLACK);
         reportTable.getTableHeader().setFont(new Font("Segoe UI", Font.BOLD, 12));
         reportTable.getTableHeader().setBackground(NAVY);
         reportTable.getTableHeader().setForeground(Color.WHITE);
+        reportTable.getTableHeader().setReorderingAllowed(false);
+        sizeReportColumns();
 
         JPanel results = new JPanel(new BorderLayout(0, 8));
         results.setBackground(Color.WHITE);
         results.setBorder(BorderFactory.createLineBorder(BORDER));
-        results.add(new JScrollPane(reportTable), BorderLayout.CENTER);
-        JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 6));
-        actions.setBackground(Color.WHITE);
         JButton export = new JButton("Export CSV");
         JButton print = new JButton("Print / Save PDF");
         styleButton(export, false);
         styleButton(print, true);
         export.addActionListener(e -> exportCsv());
         print.addActionListener(e -> printReport());
+        JScrollPane tableScroll = new JScrollPane(reportTable);
+        tableScroll.setBorder(BorderFactory.createEmptyBorder());
+        tableScroll.getViewport().setBackground(Color.WHITE);
+        if (rows.isEmpty()) {
+            JPanel emptyState = new JPanel(new BorderLayout(0, 8));
+            emptyState.setBackground(Color.WHITE);
+            emptyState.setBorder(new EmptyBorder(28, 18, 28, 18));
+            JLabel emptyTitle = new JLabel("No records found", SwingConstants.CENTER);
+            emptyTitle.setFont(new Font("Segoe UI", Font.BOLD, 16));
+            emptyTitle.setForeground(NAVY);
+            JLabel emptyHint = new JLabel("Try another employee or reporting period.", SwingConstants.CENTER);
+            emptyHint.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+            emptyHint.setForeground(MUTED);
+            emptyState.add(emptyTitle, BorderLayout.CENTER);
+            emptyState.add(emptyHint, BorderLayout.SOUTH);
+            JPanel tableContent = new JPanel(new BorderLayout());
+            tableContent.add(tableScroll, BorderLayout.NORTH);
+            tableContent.add(emptyState, BorderLayout.CENTER);
+            results.add(tableContent, BorderLayout.CENTER);
+            export.setEnabled(false);
+            print.setEnabled(false);
+        } else {
+            results.add(tableScroll, BorderLayout.CENTER);
+        }
+        JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 6));
+        actions.setBackground(Color.WHITE);
         actions.add(export);
         actions.add(print);
         results.add(actions, BorderLayout.SOUTH);
         reportBody.add(results, BorderLayout.CENTER);
         reportBody.revalidate();
         reportBody.repaint();
+    }
+
+    private void sizeReportColumns() {
+        FontMetrics metrics = reportTable.getFontMetrics(reportTable.getFont());
+        for (int column = 0; column < reportTable.getColumnCount(); column++) {
+            int width = metrics.stringWidth(reportTable.getColumnName(column)) + 34;
+            for (int row = 0; row < reportTable.getRowCount(); row++) {
+                Object value = reportTable.getValueAt(row, column);
+                if (value != null) {
+                    for (String line : value.toString().split("\\R", -1)) {
+                        width = Math.max(width, metrics.stringWidth(line) + 28);
+                    }
+                }
+            }
+            reportTable.getColumnModel().getColumn(column)
+                    .setPreferredWidth(Math.max(105, Math.min(360, width)));
+        }
     }
 
     private void exportCsv() {
@@ -517,6 +588,34 @@ public class EmployeeReportsFrame extends JFrame {
                     || !overlapsYear(leave, year)) continue;
             if (type != null && !type.equalsIgnoreCase(value(leave.getLeaveType()))) continue;
             total += daysWithinYear(leave, year);
+        }
+        return total;
+    }
+
+    private int accruedDaysForYear(int year) {
+        int currentYear = LocalDate.now().getYear();
+        if (year < currentYear) return 12;
+        if (year > currentYear) return 0;
+        return LocalDate.now().getMonthValue();
+    }
+
+    private int approvedDaysThroughAccrual(List<LeaveApplication> leaves, int employeeId,
+                                           int year, String type) {
+        if (leaves == null) return 0;
+        LocalDate yearStart = LocalDate.of(year, 1, 1);
+        LocalDate through = year < LocalDate.now().getYear()
+                ? LocalDate.of(year, 12, 31)
+                : year == LocalDate.now().getYear() ? LocalDate.now() : yearStart.minusDays(1);
+        int total = 0;
+        for (LeaveApplication leave : leaves) {
+            if (leave == null || leave.getEmployeeId() != employeeId
+                    || !"Approved".equalsIgnoreCase(value(leave.getStatus()))
+                    || !type.equalsIgnoreCase(value(leave.getLeaveType()))
+                    || leave.getStartDate() == null || leave.getEndDate() == null
+                    || through.isBefore(yearStart)) continue;
+            LocalDate start = leave.getStartDate().isBefore(yearStart) ? yearStart : leave.getStartDate();
+            LocalDate end = leave.getEndDate().isAfter(through) ? through : leave.getEndDate();
+            if (!end.isBefore(start)) total += (int) ChronoUnit.DAYS.between(start, end) + 1;
         }
         return total;
     }

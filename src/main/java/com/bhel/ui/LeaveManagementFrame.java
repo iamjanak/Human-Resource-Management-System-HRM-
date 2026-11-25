@@ -26,6 +26,7 @@ public class LeaveManagementFrame extends JFrame {
     private final int employeeId;
     private final boolean adminMode;
     private final String reviewerName;
+    private final boolean showApplicationTab;
 
     private JComboBox<String> leaveType;
     private DatePickerField startDatePicker;
@@ -43,7 +44,12 @@ public class LeaveManagementFrame extends JFrame {
     // ==========================================
 
     public LeaveManagementFrame(HRMService hrmService, int employeeId) {
-        this(hrmService, employeeId, false, null);
+        this(hrmService, employeeId, true);
+    }
+
+    public LeaveManagementFrame(HRMService hrmService, int employeeId,
+                                boolean showApplicationTab) {
+        this(hrmService, employeeId, false, null, showApplicationTab);
     }
 
     // ==========================================
@@ -51,13 +57,13 @@ public class LeaveManagementFrame extends JFrame {
     // ==========================================
 
     public LeaveManagementFrame(HRMService hrmService) {
-        this(hrmService, 0, true, "Admin");
+        this(hrmService, 0, true, "Admin", false);
     }
 
     public LeaveManagementFrame(HRMService hrmService, String reviewerName) {
         this(hrmService, 0, true,
                 reviewerName == null || reviewerName.trim().isEmpty()
-                        ? "Admin" : reviewerName.trim());
+                        ? "Admin" : reviewerName.trim(), false);
     }
 
     // ==========================================
@@ -68,16 +74,20 @@ public class LeaveManagementFrame extends JFrame {
             HRMService hrmService,
             int employeeId,
             boolean adminMode,
-            String reviewerName) {
+            String reviewerName,
+            boolean showApplicationTab) {
 
         this.hrmService = hrmService;
         this.employeeId = employeeId;
         this.adminMode = adminMode;
         this.reviewerName = reviewerName;
+        this.showApplicationTab = showApplicationTab;
 
-        setTitle("BHEL HRM - Leave Management");
-        setSize(1150, 780);
-        setMinimumSize(new Dimension(950, 650));
+        setTitle(adminMode ? "BHEL HRM - Leave Management"
+                : showApplicationTab ? "BHEL HRM - Apply for Leave"
+                : "BHEL HRM - My Leave Applications");
+        setSize(1040, 650);
+        setMinimumSize(new Dimension(860, 560));
         setLocationRelativeTo(null);
         setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
         setLayout(new BorderLayout());
@@ -100,8 +110,12 @@ public class LeaveManagementFrame extends JFrame {
             formContainer.setVisible(false);
             mainContent.add(tablePanel, BorderLayout.CENTER);
         } else {
-            mainContent.add(formContainer, BorderLayout.NORTH);
-            mainContent.add(tablePanel, BorderLayout.CENTER);
+            JTabbedPane employeeLeaveTabs = new JTabbedPane();
+            employeeLeaveTabs.addTab("Apply for Leave", formContainer);
+            employeeLeaveTabs.addTab("My Leave Applications", tablePanel);
+            employeeLeaveTabs.setSelectedIndex(showApplicationTab ? 0 : 1);
+            employeeLeaveTabs.setFont(new Font("Segoe UI", Font.BOLD, 13));
+            mainContent.add(employeeLeaveTabs, BorderLayout.CENTER);
         }
 
         loadLeaveApplications();
@@ -203,6 +217,8 @@ public class LeaveManagementFrame extends JFrame {
 
         reasonPanel.add(reasonLabel, BorderLayout.NORTH);
         reasonPanel.add(reasonScroll, BorderLayout.CENTER);
+        reasonPanel.setPreferredSize(new Dimension(500, 120));
+        reasonPanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 125));
 
         // Buttons
         JButton refreshButton = new JButton("Refresh");
@@ -234,14 +250,19 @@ public class LeaveManagementFrame extends JFrame {
         buttonPanel.add(submitButton);
 
         // Form content
-        JPanel formContent = new JPanel(
-                new BorderLayout(0, 12));
-
+        JPanel formContent = new JPanel();
         formContent.setOpaque(false);
-
-        formContent.add(fieldsPanel, BorderLayout.NORTH);
-        formContent.add(reasonPanel, BorderLayout.CENTER);
-        formContent.add(buttonPanel, BorderLayout.SOUTH);
+        formContent.setLayout(new BoxLayout(formContent, BoxLayout.Y_AXIS));
+        fieldsPanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 65));
+        buttonPanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 48));
+        fieldsPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        reasonPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        buttonPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        formContent.add(fieldsPanel);
+        formContent.add(Box.createVerticalStrut(12));
+        formContent.add(reasonPanel);
+        formContent.add(Box.createVerticalStrut(8));
+        formContent.add(buttonPanel);
 
         JPanel completeForm = new JPanel(
                 new BorderLayout(0, 12));
@@ -301,6 +322,8 @@ public class LeaveManagementFrame extends JFrame {
                     new Font("Segoe UI", Font.PLAIN, 14));
 
             dateField.setBackground(WHITE);
+            selectedDate = LocalDate.now();
+            dateField.setText(selectedDate.toString());
             dateField.setPreferredSize(
                     new Dimension(130, 38));
 
@@ -326,8 +349,8 @@ public class LeaveManagementFrame extends JFrame {
         }
 
         public void clear() {
-            selectedDate = null;
-            dateField.setText("");
+            selectedDate = LocalDate.now();
+            dateField.setText(selectedDate.toString());
         }
 
         private void showCalendar() {
@@ -429,7 +452,12 @@ public class LeaveManagementFrame extends JFrame {
 
                     if (date.equals(selectedDate)) {
                         dayButton.setBackground(
-                                new Color(190, 210, 240));
+                                new Color(0, 111, 96));
+                        dayButton.setForeground(WHITE);
+                        dayButton.setFont(new Font("Segoe UI", Font.BOLD, 12));
+                    } else if (date.equals(LocalDate.now())) {
+                        dayButton.setBackground(new Color(222, 240, 235));
+                        dayButton.setForeground(new Color(0, 111, 96));
                     }
 
                     dayButton.addActionListener(e -> {

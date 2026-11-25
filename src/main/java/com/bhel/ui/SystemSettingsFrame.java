@@ -8,6 +8,7 @@ import javax.swing.border.EmptyBorder;
 import javax.swing.border.LineBorder;
 
 import java.awt.*;
+import java.util.function.BooleanSupplier;
 
 public class SystemSettingsFrame extends JFrame {
 
@@ -19,6 +20,7 @@ public class SystemSettingsFrame extends JFrame {
 
     private final HRMService hrmService;
     private final String accountUsername;
+    private final BooleanSupplier logoutAction;
 
     private JTextField usernameField;
     private JPasswordField currentPasswordField;
@@ -36,18 +38,24 @@ public class SystemSettingsFrame extends JFrame {
     private JCheckBox notificationsCheckBox;
 
     public SystemSettingsFrame(HRMService hrmService) {
-        this(hrmService, "Admin");
+        this(hrmService, "Admin", null);
     }
 
     public SystemSettingsFrame(HRMService hrmService, String accountUsername) {
+        this(hrmService, accountUsername, null);
+    }
+
+    public SystemSettingsFrame(HRMService hrmService, String accountUsername,
+                               BooleanSupplier logoutAction) {
 
         this.hrmService = hrmService;
         this.accountUsername = accountUsername == null
                 || accountUsername.trim().isEmpty() ? "Admin" : accountUsername;
+        this.logoutAction = logoutAction;
 
         setTitle("BHEL HRM - System Settings");
-        setSize(1050, 720);
-        setMinimumSize(new Dimension(900, 600));
+        setSize(1000, 680);
+        setMinimumSize(new Dimension(820, 560));
         setLocationRelativeTo(null);
         setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
 
@@ -79,7 +87,7 @@ public class SystemSettingsFrame extends JFrame {
         title.setForeground(WHITE);
 
         JLabel subtitle = new JLabel(
-                "Configure and manage BHEL HRM system preferences"
+                "Manage your account, review policy preferences, and view server information"
         );
 
         subtitle.setFont(new Font("Segoe UI", Font.PLAIN, 13));
@@ -89,29 +97,34 @@ public class SystemSettingsFrame extends JFrame {
         titlePanel.add(Box.createVerticalStrut(5));
         titlePanel.add(subtitle);
 
-        JButton closeButton = new JButton("Close");
-
-        closeButton.setFont(
-                new Font("Segoe UI", Font.BOLD, 13)
-        );
-
-        closeButton.setForeground(NAVY);
-        closeButton.setBackground(WHITE);
-        closeButton.setFocusPainted(false);
-        closeButton.setBorder(
-                new EmptyBorder(10, 20, 10, 20)
-        );
-
-        closeButton.setCursor(
-                new Cursor(Cursor.HAND_CURSOR)
-        );
-
+        JPanel headerActions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
+        headerActions.setOpaque(false);
+        if (logoutAction != null) {
+            JButton logoutButton = new JButton("Log out");
+            styleHeaderButton(logoutButton, true);
+            logoutButton.addActionListener(e -> {
+                if (logoutAction.getAsBoolean()) dispose();
+            });
+            headerActions.add(logoutButton);
+        }
+        JButton closeButton = new JButton("Back to Dashboard");
+        styleHeaderButton(closeButton, false);
         closeButton.addActionListener(e -> dispose());
 
         header.add(titlePanel, BorderLayout.WEST);
-        header.add(closeButton, BorderLayout.EAST);
+        headerActions.add(closeButton);
+        header.add(headerActions, BorderLayout.EAST);
 
         add(header, BorderLayout.NORTH);
+    }
+
+    private void styleHeaderButton(JButton button, boolean destructive) {
+        button.setFont(new Font("Segoe UI", Font.BOLD, 13));
+        button.setForeground(destructive ? WHITE : NAVY);
+        button.setBackground(destructive ? new Color(166, 54, 61) : WHITE);
+        button.setFocusPainted(false);
+        button.setBorder(new EmptyBorder(11, 19, 11, 19));
+        button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
     }
 
     // ================= MAIN CONTENT =================
@@ -128,12 +141,18 @@ public class SystemSettingsFrame extends JFrame {
         tabs.setFont(new Font("Segoe UI", Font.BOLD, 13));
         tabs.setBackground(WHITE);
         tabs.setForeground(NAVY);
+        tabs.setTabLayoutPolicy(JTabbedPane.SCROLL_TAB_LAYOUT);
 
-        tabs.addTab("Account", createAccountPanel());
-        tabs.addTab("Attendance", createAttendancePanel());
-        tabs.addTab("Leave", createLeavePanel());
-        tabs.addTab("Database", createDatabasePanel());
-        tabs.addTab("System Info", createSystemInfoPanel());
+        tabs.addTab("Account", wrapSettingsTab(createAccountPanel()));
+        tabs.addTab("Attendance", wrapSettingsTab(createAttendancePanel()));
+        tabs.addTab("Leave", wrapSettingsTab(createLeavePanel()));
+        tabs.addTab("Database", wrapSettingsTab(createDatabasePanel()));
+        tabs.addTab("System Info", wrapSettingsTab(createSystemInfoPanel()));
+        tabs.setToolTipTextAt(0, "Administrator account and password");
+        tabs.setToolTipTextAt(1, "Working hours and attendance policy values");
+        tabs.setToolTipTextAt(2, "Leave allowance policy values");
+        tabs.setToolTipTextAt(3, "Database and RMI connection details");
+        tabs.setToolTipTextAt(4, "Application and runtime details");
 
         mainPanel.add(tabs, BorderLayout.CENTER);
 
@@ -142,13 +161,13 @@ public class SystemSettingsFrame extends JFrame {
         bottomPanel.setOpaque(false);
 
         JLabel note = new JLabel(
-                "Settings interface - database persistence is not yet connected."
+                "Account password changes are applied on the server. Attendance, leave, and notification preferences are review-only."
         );
 
         note.setFont(new Font("Segoe UI", Font.ITALIC, 11));
         note.setForeground(TEXT_GRAY);
 
-        JButton saveButton = new JButton("Save Settings");
+        JButton saveButton = new JButton("Validate Preferences");
 
         saveButton.setFont(
                 new Font("Segoe UI", Font.BOLD, 13)
@@ -201,6 +220,7 @@ public class SystemSettingsFrame extends JFrame {
         resetEmployeePasswordButton.setFocusPainted(false);
         resetEmployeePasswordButton.setBorder(
                 new EmptyBorder(9, 14, 9, 14));
+        styleActionButton(resetEmployeePasswordButton, true);
         resetEmployeePasswordButton.setAlignmentX(Component.LEFT_ALIGNMENT);
         resetEmployeePasswordButton.addActionListener(
                 e -> openEmployeePasswordResetDialog());
@@ -236,6 +256,7 @@ public class SystemSettingsFrame extends JFrame {
 
         JButton changePasswordButton = new JButton("Change Password");
         changePasswordButton.addActionListener(e -> changePassword());
+        styleActionButton(changePasswordButton, true);
         panel.add(Box.createVerticalStrut(10));
         panel.add(changePasswordButton);
 
@@ -460,7 +481,7 @@ public class SystemSettingsFrame extends JFrame {
 
     private JPanel createSectionPanel() {
 
-        JPanel panel = new JPanel();
+        JPanel panel = new SettingsContentPanel();
 
         panel.setLayout(
                 new BoxLayout(panel, BoxLayout.Y_AXIS)
@@ -472,6 +493,26 @@ public class SystemSettingsFrame extends JFrame {
         );
 
         return panel;
+    }
+
+    private JScrollPane wrapSettingsTab(JPanel panel) {
+        JScrollPane scroll = new JScrollPane(panel,
+                JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
+                JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+        scroll.setBorder(null);
+        scroll.getViewport().setBackground(WHITE);
+        scroll.getVerticalScrollBar().setUnitIncrement(16);
+        return scroll;
+    }
+
+    private static final class SettingsContentPanel extends JPanel implements Scrollable {
+        @Override public Dimension getPreferredScrollableViewportSize() { return getPreferredSize(); }
+        @Override public int getScrollableUnitIncrement(Rectangle rect, int orientation, int direction) { return 16; }
+        @Override public int getScrollableBlockIncrement(Rectangle rect, int orientation, int direction) {
+            return Math.max(16, rect.height - 16);
+        }
+        @Override public boolean getScrollableTracksViewportWidth() { return true; }
+        @Override public boolean getScrollableTracksViewportHeight() { return false; }
     }
 
     // ================= SECTION HEADING =================
@@ -488,6 +529,7 @@ public class SystemSettingsFrame extends JFrame {
         );
 
         heading.setForeground(NAVY);
+        heading.setAlignmentX(Component.LEFT_ALIGNMENT);
 
         JLabel subtitle = new JLabel(description);
 
@@ -496,6 +538,7 @@ public class SystemSettingsFrame extends JFrame {
         );
 
         subtitle.setForeground(TEXT_GRAY);
+        subtitle.setAlignmentX(Component.LEFT_ALIGNMENT);
 
         panel.add(heading);
         panel.add(Box.createVerticalStrut(7));
@@ -522,8 +565,10 @@ public class SystemSettingsFrame extends JFrame {
                 new Font("Segoe UI", Font.PLAIN, 13)
         );
 
-        field.setPreferredSize(new Dimension(350, 38));
-        field.setMaximumSize(new Dimension(450, 38));
+        field.setPreferredSize(new Dimension(420, 40));
+        field.setMaximumSize(new Dimension(640, 40));
+        field.setAlignmentX(Component.LEFT_ALIGNMENT);
+        label.setAlignmentX(Component.LEFT_ALIGNMENT);
 
         if (field instanceof JTextField) {
             field.setBorder(
@@ -571,12 +616,27 @@ public class SystemSettingsFrame extends JFrame {
                 )
         );
 
-        field.setMaximumSize(new Dimension(500, 38));
+        field.setPreferredSize(new Dimension(420, 40));
+        field.setMaximumSize(new Dimension(640, 40));
+        field.setAlignmentX(Component.LEFT_ALIGNMENT);
+        label.setAlignmentX(Component.LEFT_ALIGNMENT);
 
         panel.add(label);
         panel.add(Box.createVerticalStrut(7));
         panel.add(field);
         panel.add(Box.createVerticalStrut(18));
+    }
+
+    private void styleActionButton(JButton button, boolean primary) {
+        button.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        button.setForeground(primary ? WHITE : NAVY);
+        button.setBackground(primary ? NAVY : WHITE);
+        button.setFocusPainted(false);
+        button.setBorder(BorderFactory.createCompoundBorder(
+                new LineBorder(primary ? NAVY : BORDER),
+                new EmptyBorder(9, 15, 9, 15)));
+        button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        button.setAlignmentX(Component.LEFT_ALIGNMENT);
     }
 
     // ================= SAVE SETTINGS =================
@@ -635,14 +695,9 @@ public class SystemSettingsFrame extends JFrame {
                 return;
             }
 
-            JOptionPane.showMessageDialog(
-                    this,
-                    "Settings validation successful.\n\n"
-                            + "The settings interface is ready, but permanent "
-                            + "database saving has not yet been implemented.",
-                    "Settings",
-                    JOptionPane.INFORMATION_MESSAGE
-            );
+            JOptionPane.showMessageDialog(this,
+                    "All entered values are valid. Attendance, leave, and notification preferences remain review-only in this version.",
+                    "Settings Validation", JOptionPane.INFORMATION_MESSAGE);
 
         } catch (NumberFormatException e) {
 

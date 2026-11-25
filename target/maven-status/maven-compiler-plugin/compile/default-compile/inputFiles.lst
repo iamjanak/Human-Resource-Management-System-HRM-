@@ -7,6 +7,7 @@ D:\janak\app\BHEL – Human Resource Management System (HRM)\src\main\java\com\b
 D:\janak\app\BHEL – Human Resource Management System (HRM)\src\main\java\com\bhel\model\Department.java
 D:\janak\app\BHEL – Human Resource Management System (HRM)\src\main\java\com\bhel\model\FamilyMember.java
 D:\janak\app\BHEL – Human Resource Management System (HRM)\src\main\java\com\bhel\model\LeaveApplication.java
+D:\janak\app\BHEL – Human Resource Management System (HRM)\src\main\java\com\bhel\model\Payslip.java
 D:\janak\app\BHEL – Human Resource Management System (HRM)\src\main\java\com\bhel\remote\HRMService.java
 D:\janak\app\BHEL – Human Resource Management System (HRM)\src\main\java\com\bhel\security\CreateAdmin.java
 D:\janak\app\BHEL – Human Resource Management System (HRM)\src\main\java\com\bhel\security\PasswordUtil.java
@@ -21,5 +22,6 @@ D:\janak\app\BHEL – Human Resource Management System (HRM)\src\main\java\com\b
 D:\janak\app\BHEL – Human Resource Management System (HRM)\src\main\java\com\bhel\ui\EmployeeReportsFrame.java
 D:\janak\app\BHEL – Human Resource Management System (HRM)\src\main\java\com\bhel\ui\KeyboardNavigation.java
 D:\janak\app\BHEL – Human Resource Management System (HRM)\src\main\java\com\bhel\ui\LeaveManagementFrame.java
+D:\janak\app\BHEL – Human Resource Management System (HRM)\src\main\java\com\bhel\ui\PayslipFrame.java
 D:\janak\app\BHEL – Human Resource Management System (HRM)\src\main\java\com\bhel\ui\RegisterEmployeeFrame.java
 D:\janak\app\BHEL – Human Resource Management System (HRM)\src\main\java\com\bhel\ui\SystemSettingsFrame.java

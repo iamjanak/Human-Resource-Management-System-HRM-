@@ -38,10 +38,15 @@ public class EmployeeProfileFrame extends JFrame {
     private JTextField phoneField;
     private JTextField emailField;
     private JTextField addressField;
-    private JTextField departmentField;
-    private JTextField designationField;
-    private JTextField joiningDateField;
-    private JComboBox<String> employmentStatusField;
+    private JLabel profileNameLabel;
+    private JLabel profileRoleLabel;
+    private JLabel profileDepartmentLabel;
+    private JLabel profileIdLabel;
+    private JLabel summaryDepartment;
+    private JLabel summaryDesignation;
+    private JLabel summaryStatus;
+    private JLabel summaryJoiningDate;
+    private InitialsAvatar initialsAvatar;
 
     private DefaultTableModel tableModel;
     private JTable familyTable;
@@ -54,8 +59,8 @@ public class EmployeeProfileFrame extends JFrame {
         hrmClient = new HRMClient();
 
         setTitle("BHEL HRM | Employee Profile");
-        setSize(1050, 720);
-        setMinimumSize(new Dimension(850, 600));
+        setSize(960, 640);
+        setMinimumSize(new Dimension(760, 560));
         setLocationRelativeTo(null);
         setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
 
@@ -99,7 +104,12 @@ public class EmployeeProfileFrame extends JFrame {
         textPanel.add(subtitle);
 
         JButton closeButton = new JButton("Close");
-
+        closeButton.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        closeButton.setForeground(NAVY);
+        closeButton.setBackground(Color.WHITE);
+        closeButton.setFocusPainted(false);
+        closeButton.setBorder(new EmptyBorder(9, 18, 9, 18));
+        closeButton.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         closeButton.addActionListener(e -> dispose());
 
         header.add(textPanel, BorderLayout.WEST);
@@ -111,43 +121,56 @@ public class EmployeeProfileFrame extends JFrame {
     // ================= MAIN CONTENT =================
 
     private JPanel buildContent() {
+        JPanel profileDetails = buildProfilePanel();
+        JPanel summaryContent = new ProfileContentPanel();
+        summaryContent.setBackground(BG);
+        summaryContent.setBorder(new EmptyBorder(18, 18, 20, 24));
+        summaryContent.setLayout(new BoxLayout(summaryContent, BoxLayout.Y_AXIS));
 
-        JPanel content = new JPanel();
-        content.setBackground(BG);
-        content.setBorder(new EmptyBorder(20, 25, 20, 25));
+        JLabel summaryTitle = new JLabel("Profile Summary");
+        summaryTitle.setFont(new Font("Segoe UI", Font.BOLD, 22));
+        summaryTitle.setForeground(NAVY);
+        summaryTitle.setAlignmentX(Component.LEFT_ALIGNMENT);
+        summaryContent.add(summaryTitle);
+        summaryContent.add(Box.createVerticalStrut(14));
+        summaryContent.add(buildJobInformationPanel());
+        summaryContent.add(Box.createVerticalStrut(14));
+        summaryContent.add(profileDetails);
+        summaryContent.add(Box.createVerticalStrut(14));
+        summaryContent.add(buildFamilyPanel());
 
-        content.setLayout(new BoxLayout(content, BoxLayout.Y_AXIS));
+        JScrollPane summaryScroll = new JScrollPane(summaryContent,
+                JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
+                JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+        summaryScroll.setBorder(null);
+        summaryScroll.getViewport().setBackground(BG);
+        summaryScroll.getVerticalScrollBar().setUnitIncrement(15);
 
-        content.add(buildProfilePanel());
-        content.add(Box.createVerticalStrut(20));
-        content.add(buildFamilyPanel());
+        JPanel identityColumn = new JPanel(new BorderLayout());
+        identityColumn.setBackground(BG);
+        identityColumn.setBorder(new EmptyBorder(18, 20, 18, 10));
+        identityColumn.setPreferredSize(new Dimension(285, 0));
+        identityColumn.add(buildIdentityCard(), BorderLayout.NORTH);
 
-        JScrollPane scroll = new JScrollPane(content);
-        scroll.setBorder(null);
-        scroll.getVerticalScrollBar().setUnitIncrement(15);
+        JSplitPane split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT,
+                identityColumn, summaryScroll);
+        split.setBorder(null);
+        split.setDividerSize(1);
+        split.setResizeWeight(0.0);
+        split.setDividerLocation(285);
+        split.setContinuousLayout(true);
 
         JPanel wrapper = new JPanel(new BorderLayout());
-        wrapper.add(scroll, BorderLayout.CENTER);
-
+        wrapper.add(split, BorderLayout.CENTER);
         return wrapper;
     }
 
     // ================= PROFILE PANEL =================
 
     private JPanel buildProfilePanel() {
-
-        JPanel panel = createCard();
-
-        panel.setLayout(new BorderLayout(10, 15));
-
-        JLabel heading = new JLabel("Personal Information");
-
-        heading.setFont(new Font("Segoe UI", Font.BOLD, 18));
-        heading.setForeground(NAVY);
-
-        JPanel fields = new JPanel(new GridLayout(0, 2, 20, 15));
-        fields.setOpaque(false);
-
+        JPanel profileSections = new JPanel();
+        profileSections.setOpaque(false);
+        profileSections.setLayout(new BoxLayout(profileSections, BoxLayout.Y_AXIS));
         employeeIdField = readOnlyField();
         userIdField = readOnlyField();
         createdAtField = readOnlyField();
@@ -160,45 +183,150 @@ public class EmployeeProfileFrame extends JFrame {
         phoneField = new JTextField();
         emailField = new JTextField();
         addressField = new JTextField();
-        departmentField = readOnlyField();
-        designationField = readOnlyField();
-        joiningDateField = readOnlyField();
-        employmentStatusField = new JComboBox<>(new String[]{
-                "Active", "On Leave", "Resigned", "Terminated"});
-        employmentStatusField.setEnabled(false);
-
-        fields.add(createField("Employee ID", employeeIdField));
-        fields.add(createField("User ID", userIdField));
-        fields.add(createField("Created At", createdAtField));
-        fields.add(createField("First Name", firstNameField));
-        fields.add(createField("Last Name", lastNameField));
-        fields.add(createField("IC / Passport Number", icPassportField));
-        fields.add(createField("Username", usernameField));
-        fields.add(createField("Gender", genderField));
-        fields.add(createField("Date of Birth (YYYY-MM-DD)", dateOfBirthField));
-        fields.add(createField("Phone", phoneField));
-        fields.add(createField("Email", emailField));
-        fields.add(createField("Address", addressField));
-        fields.add(createField("Department (HR managed)", departmentField));
-        fields.add(createField("Designation (HR managed)", designationField));
-        fields.add(createField("Joining Date", joiningDateField));
-        fields.add(createField("Employment Status", employmentStatusField));
-
+        JPanel personalCard = createCard();
+        personalCard.setLayout(new BorderLayout(10, 14));
+        personalCard.add(sectionHeading("Personal Information"), BorderLayout.NORTH);
+        JPanel personalFields = new JPanel(new GridLayout(0, 2, 16, 13));
+        personalFields.setOpaque(false);
+        personalFields.add(createField("First name", firstNameField));
+        personalFields.add(createField("Last name", lastNameField));
+        personalFields.add(createField("IC / Passport number", icPassportField));
+        personalFields.add(createField("Gender", genderField));
+        personalFields.add(createField("Date of birth (YYYY-MM-DD)", dateOfBirthField));
+        personalFields.add(createField("Phone", phoneField));
+        personalFields.add(createField("Email", emailField));
+        personalFields.add(createField("Address", addressField));
+        personalCard.add(personalFields, BorderLayout.CENTER);
+        JLabel editNote = new JLabel("You can update your name, identification, and contact details.");
+        editNote.setFont(new Font("Segoe UI", Font.PLAIN, 11));
+        editNote.setForeground(new Color(105, 115, 130));
         JButton updateButton = new JButton("Save Profile");
-
         styleButton(updateButton, GREEN);
-
         updateButton.addActionListener(e -> updateProfile());
+        JPanel actions = new JPanel(new BorderLayout(8, 0));
+        actions.setOpaque(false);
+        actions.add(editNote, BorderLayout.CENTER);
+        actions.add(updateButton, BorderLayout.EAST);
+        personalCard.add(actions, BorderLayout.SOUTH);
 
-        JPanel bottom = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        bottom.setOpaque(false);
-        bottom.add(updateButton);
+        JPanel accountCard = createCard();
+        accountCard.setLayout(new BorderLayout(10, 12));
+        accountCard.add(sectionHeading("Account Information"), BorderLayout.NORTH);
+        JPanel accountFields = new JPanel(new GridLayout(0, 2, 16, 13));
+        accountFields.setOpaque(false);
+        accountFields.add(createField("Employee ID", employeeIdField));
+        accountFields.add(createField("User ID", userIdField));
+        accountFields.add(createField("Username", usernameField));
+        accountFields.add(createField("Account created", createdAtField));
+        accountCard.add(accountFields, BorderLayout.CENTER);
 
-        panel.add(heading, BorderLayout.NORTH);
-        panel.add(fields, BorderLayout.CENTER);
-        panel.add(bottom, BorderLayout.SOUTH);
+        profileSections.add(personalCard);
+        profileSections.add(Box.createVerticalStrut(14));
+        profileSections.add(accountCard);
+        profileSections.setAlignmentX(Component.LEFT_ALIGNMENT);
+        return profileSections;
+    }
 
-        return panel;
+    private JPanel buildIdentityCard() {
+        JPanel card = createCard();
+        card.setLayout(new BoxLayout(card, BoxLayout.Y_AXIS));
+        initialsAvatar = new InitialsAvatar();
+        initialsAvatar.setAlignmentX(Component.CENTER_ALIGNMENT);
+        card.add(Box.createVerticalStrut(8));
+        card.add(initialsAvatar);
+        card.add(Box.createVerticalStrut(16));
+
+        profileNameLabel = new JLabel("Employee");
+        profileNameLabel.setFont(new Font("Segoe UI", Font.BOLD, 21));
+        profileNameLabel.setForeground(NAVY);
+        profileNameLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        card.add(profileNameLabel);
+        card.add(Box.createVerticalStrut(5));
+
+        profileRoleLabel = identityDetailLabel("");
+        profileDepartmentLabel = identityDetailLabel("");
+        card.add(profileRoleLabel);
+        card.add(Box.createVerticalStrut(3));
+        card.add(profileDepartmentLabel);
+        card.add(Box.createVerticalStrut(13));
+
+        profileIdLabel = new JLabel("EMPLOYEE ID  -");
+        profileIdLabel.setFont(new Font("Segoe UI", Font.BOLD, 11));
+        profileIdLabel.setForeground(Color.WHITE);
+        profileIdLabel.setOpaque(true);
+        profileIdLabel.setBackground(GREEN);
+        profileIdLabel.setBorder(new EmptyBorder(6, 9, 6, 9));
+        profileIdLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        card.add(profileIdLabel);
+        card.add(Box.createVerticalStrut(16));
+        card.add(new JSeparator());
+        card.add(Box.createVerticalStrut(12));
+
+        JLabel hint = new JLabel("Profile overview");
+        hint.setFont(new Font("Segoe UI", Font.BOLD, 13));
+        hint.setForeground(NAVY);
+        hint.setAlignmentX(Component.LEFT_ALIGNMENT);
+        card.add(hint);
+        card.add(Box.createVerticalStrut(6));
+        JLabel help = new JLabel("<html><div style='width:185px'>Keep your contact details current. Department, role, and employment status are managed by HR.</div></html>");
+        help.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        help.setForeground(new Color(105, 115, 130));
+        help.setAlignmentX(Component.LEFT_ALIGNMENT);
+        card.add(help);
+        card.setPreferredSize(new Dimension(245, 390));
+        return card;
+    }
+
+    private JPanel buildJobInformationPanel() {
+        JPanel card = createCard();
+        card.setLayout(new BorderLayout(10, 12));
+        card.add(sectionHeading("Job Information"), BorderLayout.NORTH);
+        JPanel rows = new JPanel(new GridLayout(0, 2, 14, 10));
+        rows.setOpaque(false);
+        summaryDepartment = summaryValue();
+        summaryDesignation = summaryValue();
+        summaryStatus = summaryValue();
+        summaryJoiningDate = summaryValue();
+        rows.add(summaryRow("Department", summaryDepartment));
+        rows.add(summaryRow("Job title", summaryDesignation));
+        rows.add(summaryRow("Status", summaryStatus));
+        rows.add(summaryRow("Join date", summaryJoiningDate));
+        card.add(rows, BorderLayout.CENTER);
+        card.setAlignmentX(Component.LEFT_ALIGNMENT);
+        return card;
+    }
+
+    private JPanel summaryRow(String title, JLabel value) {
+        JPanel row = new JPanel(new BorderLayout(8, 0));
+        row.setOpaque(false);
+        JLabel label = new JLabel(title);
+        label.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        label.setForeground(TEXT);
+        row.add(label, BorderLayout.WEST);
+        row.add(value, BorderLayout.CENTER);
+        return row;
+    }
+
+    private JLabel summaryValue() {
+        JLabel label = new JLabel("—");
+        label.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        label.setForeground(NAVY);
+        return label;
+    }
+
+    private JLabel identityDetailLabel(String text) {
+        JLabel label = new JLabel(text);
+        label.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        label.setForeground(new Color(105, 115, 130));
+        label.setAlignmentX(Component.LEFT_ALIGNMENT);
+        return label;
+    }
+
+    private JLabel sectionHeading(String text) {
+        JLabel heading = new JLabel(text);
+        heading.setFont(new Font("Segoe UI", Font.BOLD, 17));
+        heading.setForeground(NAVY);
+        return heading;
     }
 
     // ================= FAMILY PANEL =================
@@ -238,14 +366,13 @@ public class EmployeeProfileFrame extends JFrame {
                 new Font("Segoe UI", Font.BOLD, 12)
         );
 
-        familyTable.setSelectionMode(
-                ListSelectionModel.SINGLE_SELECTION
-        );
+        familyTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        familyTable.setFillsViewportHeight(true);
 
         JScrollPane tableScroll = new JScrollPane(familyTable);
-        tableScroll.setPreferredSize(new Dimension(900, 180));
+        tableScroll.setPreferredSize(new Dimension(0, 155));
 
-        JButton addButton = new JButton("＋ Add Family Member");
+        JButton addButton = new JButton("Add Family Member");
         JButton editButton = new JButton("Edit Selected");
         JButton deleteButton = new JButton("Delete Selected");
         JButton refreshButton = new JButton("Refresh");
@@ -260,17 +387,23 @@ public class EmployeeProfileFrame extends JFrame {
         deleteButton.addActionListener(e -> deleteFamilyMember());
         refreshButton.addActionListener(e -> loadFamilyMembers());
 
-        JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        JPanel actions = new JPanel(new GridLayout(2, 2, 8, 8));
         actions.setOpaque(false);
-
-        actions.add(refreshButton);
         actions.add(addButton);
         actions.add(editButton);
         actions.add(deleteButton);
+        actions.add(refreshButton);
 
-        panel.add(heading, BorderLayout.NORTH);
+        JPanel familyHeader = new JPanel();
+        familyHeader.setOpaque(false);
+        familyHeader.setLayout(new BoxLayout(familyHeader, BoxLayout.Y_AXIS));
+        heading.setAlignmentX(Component.LEFT_ALIGNMENT);
+        familyHeader.add(heading);
+        familyHeader.add(Box.createVerticalStrut(12));
+        familyHeader.add(actions);
+
+        panel.add(familyHeader, BorderLayout.NORTH);
         panel.add(tableScroll, BorderLayout.CENTER);
-        panel.add(actions, BorderLayout.SOUTH);
 
         return panel;
     }
@@ -313,13 +446,17 @@ public class EmployeeProfileFrame extends JFrame {
             phoneField.setText(employee.getPhone());
             emailField.setText(employee.getEmail());
             addressField.setText(employee.getAddress());
-            departmentField.setText(employee.getDepartment());
-            designationField.setText(employee.getDesignation());
-            joiningDateField.setText(employee.getJoiningDate() == null
-                    ? "" : employee.getJoiningDate().toString());
-            employmentStatusField.setSelectedItem(
-                    employee.getEmploymentStatus() == null
-                            ? "Active" : employee.getEmploymentStatus());
+            summaryDepartment.setText(displayValue(employee.getDepartment()));
+            summaryDesignation.setText(displayValue(employee.getDesignation()));
+            summaryJoiningDate.setText(employee.getJoiningDate() == null
+                    ? "Not provided" : employee.getJoiningDate().toString());
+            summaryStatus.setText(displayValue(employee.getEmploymentStatus()));
+            profileNameLabel.setText((employee.getFirstName() + " "
+                    + employee.getLastName()).trim());
+            profileRoleLabel.setText(displayValue(employee.getDesignation()));
+            profileDepartmentLabel.setText(displayValue(employee.getDepartment()));
+            profileIdLabel.setText("EMPLOYEE ID  " + employee.getEmployeeId());
+            initialsAvatar.setInitials(initials(employee.getFirstName(), employee.getLastName()));
 
         } catch (Exception e) {
 
@@ -373,10 +510,10 @@ public class EmployeeProfileFrame extends JFrame {
                     phoneField.getText().trim(),
                     emailField.getText().trim(),
                     addressField.getText().trim(),
-                    departmentField.getText().trim(),
-                    designationField.getText().trim(),
-                    parseOptionalDate(joiningDateField.getText()),
-                    (String) employmentStatusField.getSelectedItem()
+                    employee.getDepartment(),
+                    employee.getDesignation(),
+                    employee.getJoiningDate(),
+                    employee.getEmploymentStatus()
             );
 
             JOptionPane.showMessageDialog(this, result);
@@ -699,17 +836,71 @@ public class EmployeeProfileFrame extends JFrame {
 
         title.setFont(new Font("Segoe UI", Font.BOLD, 12));
         title.setForeground(TEXT);
+        title.setAlignmentX(Component.LEFT_ALIGNMENT);
 
         field.setFont(new Font("Segoe UI", Font.PLAIN, 13));
         field.setMaximumSize(
                 new Dimension(Integer.MAX_VALUE, 35)
         );
+        field.setPreferredSize(new Dimension(180, 35));
 
         panel.add(title);
         panel.add(Box.createVerticalStrut(6));
         panel.add(field);
 
         return panel;
+    }
+
+    private String displayValue(String value) {
+        return value == null || value.isBlank() ? "Not provided" : value.trim();
+    }
+
+    private String initials(String firstName, String lastName) {
+        String first = firstName == null ? "" : firstName.trim();
+        String last = lastName == null ? "" : lastName.trim();
+        String result = (first.isEmpty() ? "" : first.substring(0, 1))
+                + (last.isEmpty() ? "" : last.substring(0, 1));
+        return result.isEmpty() ? "HR" : result.toUpperCase(java.util.Locale.ROOT);
+    }
+
+    private static final class ProfileContentPanel extends JPanel implements Scrollable {
+        @Override public Dimension getPreferredScrollableViewportSize() { return getPreferredSize(); }
+        @Override public int getScrollableUnitIncrement(Rectangle rect, int orientation, int direction) { return 16; }
+        @Override public int getScrollableBlockIncrement(Rectangle rect, int orientation, int direction) {
+            return Math.max(16, rect.height - 16);
+        }
+        @Override public boolean getScrollableTracksViewportWidth() { return true; }
+        @Override public boolean getScrollableTracksViewportHeight() { return false; }
+    }
+
+    private static final class InitialsAvatar extends JComponent {
+        private String initials = "HR";
+
+        private InitialsAvatar() {
+            setPreferredSize(new Dimension(88, 88));
+            setMinimumSize(new Dimension(88, 88));
+            setMaximumSize(new Dimension(88, 88));
+        }
+
+        private void setInitials(String initials) {
+            this.initials = initials;
+            repaint();
+        }
+
+        @Override protected void paintComponent(Graphics graphics) {
+            Graphics2D g = (Graphics2D) graphics.create();
+            g.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
+                    RenderingHints.VALUE_ANTIALIAS_ON);
+            g.setColor(new Color(222, 240, 235));
+            g.fillOval(3, 3, getWidth() - 6, getHeight() - 6);
+            g.setFont(new Font("Segoe UI", Font.BOLD, 26));
+            g.setColor(GREEN);
+            FontMetrics metrics = g.getFontMetrics();
+            int x = (getWidth() - metrics.stringWidth(initials)) / 2;
+            int y = (getHeight() - metrics.getHeight()) / 2 + metrics.getAscent();
+            g.drawString(initials, x, y);
+            g.dispose();
+        }
     }
 
     private JTextField readOnlyField() {

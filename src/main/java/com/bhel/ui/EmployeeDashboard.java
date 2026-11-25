@@ -40,8 +40,8 @@ public class EmployeeDashboard extends JFrame {
         this.employeeId = employee.getEmployeeId();
 
         setTitle("BHEL HRM - Employee Dashboard");
-        setSize(1150, 700);
-        setMinimumSize(new Dimension(1000, 600));
+        setSize(1080, 740);
+        setMinimumSize(new Dimension(980, 620));
         setLocationRelativeTo(null);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLayout(new BorderLayout());
@@ -160,8 +160,6 @@ public class EmployeeDashboard extends JFrame {
 
         addMenuItem(menuPanel, "My Profile", () -> openProfile());
 
-        addMenuItem(menuPanel, "Family Details", () -> openProfile());
-
         addMenuItem(menuPanel, "Apply for Leave",
                 () -> openLeaveManagement("Apply for Leave"));
 
@@ -170,6 +168,12 @@ public class EmployeeDashboard extends JFrame {
 
         addMenuItem(menuPanel, "Leave Balance",
                 this::showLeaveBalance);
+
+        addMenuItem(menuPanel, "Time Requests",
+                this::openTimeRequests);
+
+        addMenuItem(menuPanel, "My Payslips",
+                this::showMyPayslips);
 
         JPanel logoutPanel = new JPanel(new BorderLayout());
 
@@ -276,7 +280,7 @@ public class EmployeeDashboard extends JFrame {
         headingPanel.add(Box.createVerticalStrut(8));
         headingPanel.add(subtitle);
 
-        JPanel dashboardBody = new JPanel();
+        JPanel dashboardBody = new DashboardContentPanel();
         dashboardBody.setBackground(LIGHT_BG);
         dashboardBody.setLayout(
                 new BoxLayout(dashboardBody, BoxLayout.Y_AXIS));
@@ -302,18 +306,25 @@ public class EmployeeDashboard extends JFrame {
         dashboardBody.add(quickAccessHeading);
         dashboardBody.add(Box.createVerticalStrut(14));
 
-        JPanel quickAccess = new JPanel(new GridLayout(1, 3, 16, 16));
+        JPanel quickAccess = new JPanel(new GridLayout(0, 2, 16, 16));
         quickAccess.setBackground(LIGHT_BG);
-        quickAccess.setMaximumSize(new Dimension(Integer.MAX_VALUE, 150));
+        quickAccess.setMaximumSize(new Dimension(Integer.MAX_VALUE, 450));
         quickAccess.add(createDashboardCard(
-                "My Profile", "View and update your personal information",
+                "My Profile", "Update your personal details and manage family records in one place",
                 this::openProfile));
         quickAccess.add(createDashboardCard(
-                "Family Details", "View and manage your family information",
-                this::openProfile));
+                "Apply for Leave", "Submit a leave request and track its status",
+                () -> openLeaveManagement("Apply for Leave")));
         quickAccess.add(createDashboardCard(
                 "My Attendance", "Check in or out and view your attendance history",
                 this::showMyAttendance));
+
+        quickAccess.add(createDashboardCard(
+                "My Payslips", "Review and print your monthly pay statements",
+                this::showMyPayslips));
+        quickAccess.add(createDashboardCard(
+                "Time Requests", "Request short time away, attendance corrections, or overtime",
+                this::openTimeRequests));
 
         dashboardBody.add(quickAccess);
 
@@ -338,6 +349,21 @@ public class EmployeeDashboard extends JFrame {
         heading.setForeground(NAVY);
         heading.setAlignmentX(Component.LEFT_ALIGNMENT);
         return heading;
+    }
+
+    private static final class DashboardContentPanel extends JPanel
+            implements Scrollable {
+        @Override public Dimension getPreferredScrollableViewportSize() {
+            return getPreferredSize();
+        }
+        @Override public int getScrollableUnitIncrement(Rectangle visibleRect,
+                                                        int orientation,
+                                                        int direction) { return 16; }
+        @Override public int getScrollableBlockIncrement(Rectangle visibleRect,
+                                                         int orientation,
+                                                         int direction) { return Math.max(visibleRect.height - 16, 16); }
+        @Override public boolean getScrollableTracksViewportWidth() { return true; }
+        @Override public boolean getScrollableTracksViewportHeight() { return false; }
     }
 
     private JPanel createSummaryCard(String label, String value,
@@ -465,6 +491,25 @@ public class EmployeeDashboard extends JFrame {
         }
     }
 
+    private void showMyPayslips() {
+        if (hrmService == null) {
+            JOptionPane.showMessageDialog(this, "The HRM server is unavailable. Start the server and try again.",
+                    "Payslips", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+        new PayslipFrame(hrmService, employee.getAttendanceSessionToken(), false).setVisible(true);
+    }
+
+    private void openTimeRequests() {
+        if (hrmService == null) {
+            JOptionPane.showMessageDialog(this,
+                    "The HRM server is unavailable. Start the server and try again.",
+                    "Time Requests", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+        new TimeRequestFrame(hrmService, employee.getAttendanceSessionToken()).setVisible(true);
+    }
+
     private void showMyAttendance() {
         if (hrmService == null) {
             JOptionPane.showMessageDialog(this,
@@ -513,21 +558,22 @@ public class EmployeeDashboard extends JFrame {
         JPanel fields = new JPanel(new GridBagLayout());
         fields.setOpaque(false);
         GridBagConstraints c = new GridBagConstraints();
-        c.insets = new Insets(5, 5, 7, 10);
-        c.anchor = GridBagConstraints.WEST;
+        c.insets = new Insets(5, 7, 5, 10);
         c.fill = GridBagConstraints.HORIZONTAL;
-        c.gridx = 0; c.gridy = 0; c.weightx = 0;
+        c.anchor = GridBagConstraints.WEST;
+        c.gridx = 0; c.gridy = 0; c.weightx = 0.5;
         fields.add(attendanceFieldLabel("Start Time *"), c);
-        c.gridx = 1; c.weightx = 1;
-        fields.add(startTimeInput, c);
-        c.gridx = 2; c.weightx = 0;
+        c.gridx = 1;
         fields.add(attendanceFieldLabel("End Time"), c);
-        c.gridx = 3; c.weightx = 1;
+
+        c.gridy = 1; c.gridx = 0; c.weightx = 0.5;
+        fields.add(startTimeInput, c);
+        c.gridx = 1;
         fields.add(endTimeInput, c);
 
-        c.gridx = 0; c.gridy = 1; c.weightx = 0;
+        c.gridx = 0; c.gridy = 2; c.gridwidth = 2; c.weightx = 1;
         fields.add(attendanceFieldLabel("Remarks *"), c);
-        c.gridx = 1; c.gridwidth = 3; c.weightx = 1; c.weighty = 1;
+        c.gridy = 3; c.weighty = 1;
         c.fill = GridBagConstraints.BOTH;
         JScrollPane remarksScroll = new JScrollPane(remarksArea);
         remarksScroll.setBorder(BorderFactory.createLineBorder(BORDER));
@@ -628,7 +674,14 @@ public class EmployeeDashboard extends JFrame {
         attendancePanel.add(formCard, BorderLayout.NORTH);
         attendancePanel.add(historyPanel, BorderLayout.CENTER);
         page.add(heading, BorderLayout.NORTH);
-        page.add(attendancePanel, BorderLayout.CENTER);
+        JScrollPane attendanceScroll = new JScrollPane(attendancePanel,
+                JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
+                JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+        attendanceScroll.setBorder(null);
+        attendanceScroll.setOpaque(false);
+        attendanceScroll.getViewport().setOpaque(false);
+        attendanceScroll.getVerticalScrollBar().setUnitIncrement(16);
+        page.add(attendanceScroll, BorderLayout.CENTER);
         contentPanel.add(page, BorderLayout.CENTER);
         contentPanel.revalidate();
         contentPanel.repaint();
@@ -700,14 +753,14 @@ public class EmployeeDashboard extends JFrame {
         private final boolean optional;
 
         AttendanceTimeInput(boolean optional) {
-            super(new FlowLayout(FlowLayout.LEFT, 5, 0));
+            super(new FlowLayout(FlowLayout.LEFT, 4, 0));
             this.optional = optional;
             setOpaque(false);
             styleTimeSpinner(hour, "Hour (1–12)", "00");
             styleTimeSpinner(minute, "Minutes (0–59)", "00");
             meridiem.setFont(new Font("Segoe UI", Font.PLAIN, 13));
             meridiem.setBackground(Color.WHITE);
-            meridiem.setPreferredSize(new Dimension(70, 34));
+            meridiem.setPreferredSize(new Dimension(62, 34));
             enabledCheck.setOpaque(false);
             enabledCheck.setForeground(NAVY);
             enabledCheck.setVisible(optional);
@@ -750,7 +803,7 @@ public class EmployeeDashboard extends JFrame {
         private void styleTimeSpinner(JSpinner spinner, String tooltip, String format) {
             spinner.setFont(new Font("Segoe UI", Font.PLAIN, 13));
             spinner.setToolTipText(tooltip + "; use the arrows or type a value");
-            spinner.setPreferredSize(new Dimension(spinner == hour ? 88 : 88, 34));
+            spinner.setPreferredSize(new Dimension(70, 34));
             JSpinner.NumberEditor editor = new JSpinner.NumberEditor(spinner, format);
             editor.getTextField().setFont(new Font("Segoe UI", Font.PLAIN, 13));
             editor.getTextField().setHorizontalAlignment(JTextField.CENTER);
@@ -799,8 +852,9 @@ public class EmployeeDashboard extends JFrame {
             return;
         }
 
+        boolean showApplicationTab = "Apply for Leave".equalsIgnoreCase(pageTitle);
         LeaveManagementFrame leaveFrame =
-                new LeaveManagementFrame(hrmService, employeeId);
+                new LeaveManagementFrame(hrmService, employeeId, showApplicationTab);
         leaveFrame.setTitle("BHEL HRM - " + pageTitle);
         leaveFrame.setVisible(true);
     }
@@ -822,9 +876,7 @@ public class EmployeeDashboard extends JFrame {
             List<LeaveApplication> applications =
                     hrmService.getEmployeeLeaves(employeeId);
 
-            double annualAccrued = 1.0;
-            double sickAccrued = 1.0;
-            double emergencyAccrued = 1.0;
+            double accrued = today.getMonthValue();
 
             int annualUsed = approvedDaysTaken(
                     applications, "Annual Leave", yearStart, today);
@@ -836,15 +888,15 @@ public class EmployeeDashboard extends JFrame {
             JPanel balances = new JPanel(new GridLayout(1, 3, 16, 16));
             balances.setBackground(LIGHT_BG);
             balances.add(createBalanceCard(
-                    "Annual Leave", annualAccrued, annualUsed));
+                    "Annual Leave", accrued, annualUsed));
             balances.add(createBalanceCard(
-                    "Sick Leave", sickAccrued, sickUsed));
+                    "Sick Leave", accrued, sickUsed));
             balances.add(createBalanceCard(
-                    "Emergency Leave", emergencyAccrued, emergencyUsed));
+                    "Emergency Leave", accrued, emergencyUsed));
 
-            JLabel policyNote = new JLabel("<html>Each leave type starts with "
-                    + "a 1-day balance. Approved leave used is counted through today, using "
-                    + "inclusive calendar days. Pending and future leave is not deducted.</html>");
+            JLabel policyNote = new JLabel("<html>Each leave type accrues 1 day on the first of every month, "
+                    + "starting at 1 day in January. Approved leave is counted through today using "
+                    + "inclusive calendar days; pending and future leave is not deducted.</html>");
             policyNote.setFont(new Font("Segoe UI", Font.PLAIN, 12));
             policyNote.setForeground(TEXT_GRAY);
 
@@ -874,8 +926,8 @@ public class EmployeeDashboard extends JFrame {
             title.setFont(new Font("Segoe UI", Font.BOLD, 28));
             title.setForeground(NAVY);
 
-            JLabel subtitle = new JLabel(
-                    "Your leave accrual and approved leave used this year.");
+            JLabel subtitle = new JLabel("Your leave accrual and approved leave used through "
+                    + today.format(java.time.format.DateTimeFormatter.ofPattern("d MMMM yyyy")) + ".");
             subtitle.setFont(new Font("Segoe UI", Font.PLAIN, 14));
             subtitle.setForeground(TEXT_GRAY);
 
@@ -944,13 +996,13 @@ public class EmployeeDashboard extends JFrame {
         typeLabel.setFont(new Font("Segoe UI", Font.BOLD, 15));
         typeLabel.setForeground(NAVY);
 
-        JLabel availableValue = new JLabel(formatDays(available) + " days");
+        JLabel availableValue = new JLabel(formatDays(available) + (Math.abs(available) == 1 ? " day" : " days"));
         availableValue.setFont(new Font("Segoe UI", Font.BOLD, 25));
-        availableValue.setForeground(NAVY);
+        availableValue.setForeground(available < 0 ? new Color(176, 55, 55) : NAVY);
 
-        JLabel accruedLabel = new JLabel(
-                "Starting balance: " + formatDays(accrued) + " days");
-        JLabel usedLabel = new JLabel("Approved used: " + used + " days");
+        JLabel accruedLabel = new JLabel("Accrued this year: " + formatDays(accrued)
+                + (accrued == 1 ? " day" : " days"));
+        JLabel usedLabel = new JLabel("Approved used: " + used + (used == 1 ? " day" : " days"));
         for (JLabel detail : new JLabel[]{accruedLabel, usedLabel}) {
             detail.setFont(new Font("Segoe UI", Font.PLAIN, 11));
             detail.setForeground(TEXT_GRAY);
